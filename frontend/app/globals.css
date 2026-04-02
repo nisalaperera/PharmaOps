@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --color-primary:      #008080;
+    --color-navy:         #004B79;
+    --color-danger:       #ED1B2E;
+    --color-bg:           #f8fafc;
+    --color-surface:      #ffffff;
+    --color-surface-2:    #f1f5f9;
+    --color-border:       #e2e8f0;
+    --color-text:         #0f172a;
+    --color-text-muted:   #64748b;
+    --color-text-inverse: #ffffff;
+    --sidebar-width:      260px;
+    --sidebar-collapsed:  68px;
+    --header-height:      64px;
+  }
+
+  .dark {
+    --color-bg:         #0f172a;
+    --color-surface:    #1e293b;
+    --color-surface-2:  #334155;
+    --color-border:     #334155;
+    --color-text:       #f1f5f9;
+    --color-text-muted: #94a3b8;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar       { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--color-surface-2); }
+  ::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
+}
+
+@layer components {
+  /* Surface cards */
+  .surface {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+  }
+
+  /* Page container */
+  .page-container {
+    @apply p-6 space-y-6 animate-fade-in;
+  }
+
+  /* Section heading */
+  .page-title {
+    @apply text-2xl font-bold;
+    color: var(--color-text);
+  }
+
+  .page-subtitle {
+    @apply text-sm;
+    color: var(--color-text-muted);
+  }
+
+  /* Table */
+  .table-wrapper {
+    @apply overflow-x-auto rounded-xl border;
+    border-color: var(--color-border);
+  }
+
+  table.data-table {
+    @apply w-full text-sm;
+  }
+
+  table.data-table thead tr {
+    @apply text-xs uppercase tracking-wider;
+    background-color: var(--color-surface-2);
+    color: var(--color-text-muted);
+  }
+
+  table.data-table thead th {
+    @apply px-4 py-3 text-left font-semibold whitespace-nowrap;
+  }
+
+  table.data-table tbody tr {
+    @apply border-t transition-colors duration-150;
+    border-color: var(--color-border);
+  }
+
+  table.data-table tbody tr:hover {
+    background-color: var(--color-surface-2);
+  }
+
+  table.data-table tbody td {
+    @apply px-4 py-3 whitespace-nowrap;
+  }
+
+  /* Form elements */
+  .form-label {
+    @apply block text-sm font-medium mb-1;
+    color: var(--color-text);
+  }
+
+  .form-input {
+    @apply w-full rounded-lg px-3 py-2 text-sm transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+  }
+
+  .form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .form-error {
+    @apply text-xs mt-1;
+    color: var(--color-danger);
+  }
+
+  /* Sidebar link */
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+           transition-all duration-150 cursor-pointer select-none;
+    color: var(--color-text-muted);
+  }
+
+  .nav-link:hover {
+    background-color: var(--color-surface-2);
+    color: var(--color-text);
+  }
+
+  .nav-link.active {
+    background-color: rgba(0, 128, 128, 0.12);
+    color: var(--color-primary);
+  }
+
+  .dark .nav-link.active {
+    background-color: rgba(0, 128, 128, 0.2);
+  }
+}
