@@ -2,7 +2,27 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(find F:/Project/PharmaOps -not -path */.next/* -not -path */.git/* -not -path */node_modules/* -type d)",
+      "Bash(mkdir -p src)",
+      "Bash(mv app:*)",
+      "Bash(mv components:*)",
+      "Bash(mv hooks:*)",
+      "Bash(mv lib:*)",
+      "Bash(powershell -Command \"Copy-Item -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\app' -Destination 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\app' -Recurse -Force; Write-Host 'app copied'\" 2>&1)",
+      "Bash(powershell -Command \"Copy-Item -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\components' -Destination 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\components' -Recurse -Force; Write-Host 'components copied'\" 2>&1)",
+      "Bash(powershell -Command \"\nNew-Item -ItemType Directory -Force -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\modules\\\\branches\\\\components' | Out-Null\nNew-Item -ItemType Directory -Force -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\modules\\\\profile\\\\components' | Out-Null\nNew-Item -ItemType Directory -Force -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\modules\\\\users\\\\components' | Out-Null\nWrite-Host 'Directories created'\n\")",
+      "Bash(powershell -Command \"\nRemove-Item -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\app' -Recurse -Force -ErrorAction SilentlyContinue\nRemove-Item -Path 'F:\\\\Project\\\\PharmaOps\\\\frontend\\\\components' -Recurse -Force -ErrorAction SilentlyContinue\nWrite-Host 'Old root folders removed \\(or still locked - check manually\\)'\n\")",
+      "Bash(grep -v \"^node_modules$\")",
+      "Bash(powershell -Command \"\nGet-ChildItem -Path 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\app\\\\routers' -Filter '*.py' | Where-Object { \\\\$_.Name -ne '__init__.py' } | ForEach-Object {\n    Copy-Item \\\\$_.FullName 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\api\\\\v1\\\\'\n}\nWrite-Host 'Routers copied to api/v1/'\nls 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\api\\\\v1\\\\'\n\")",
+      "Bash(powershell -Command \"\n\\\\$v1Path = 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\api\\\\v1'\nGet-ChildItem -Path \\\\$v1Path -Filter '*.py' | ForEach-Object {\n    \\\\$content = Get-Content \\\\$_.FullName -Raw\n    \\\\$content = \\\\$content -replace 'from app\\\\.config import', 'from app.core.config import'\n    \\\\$content = \\\\$content -replace 'from app\\\\.database import', 'from app.core.database import'\n    \\\\$content = \\\\$content -replace 'from app\\\\.firebase_client import', 'from app.core.firebase_client import'\n    Set-Content \\\\$_.FullName \\\\$content -NoNewline\n}\nWrite-Host 'Router imports updated'\n\")",
+      "Bash(powershell -Command \"\n\\\\$mwPath = 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\middleware'\nGet-ChildItem -Path \\\\$mwPath -Filter '*.py' | ForEach-Object {\n    \\\\$content = Get-Content \\\\$_.FullName -Raw\n    \\\\$content = \\\\$content -replace 'from app\\\\.config import', 'from app.core.config import'\n    \\\\$content = \\\\$content -replace 'from app\\\\.database import', 'from app.core.database import'\n    \\\\$content = \\\\$content -replace 'from app\\\\.firebase_client import', 'from app.core.firebase_client import'\n    Set-Content \\\\$_.FullName \\\\$content -NoNewline\n}\nWrite-Host 'Middleware imports updated'\n\")",
+      "Bash(powershell -Command \"\n\\\\$corePath = 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\core'\nGet-ChildItem -Path \\\\$corePath -Filter '*.py' | ForEach-Object {\n    \\\\$content = Get-Content \\\\$_.FullName -Raw\n    \\\\$content = \\\\$content -replace 'from app\\\\.config import', 'from app.core.config import'\n    \\\\$content = \\\\$content -replace 'from app\\\\.database import', 'from app.core.database import'\n    Set-Content \\\\$_.FullName \\\\$content -NoNewline\n}\nWrite-Host 'Core imports updated'\n\")",
+      "Bash(powershell -Command \"Remove-Item -Path 'F:\\\\Project\\\\PharmaOps\\\\backend\\\\app' -Recurse -Force; Write-Host 'Removed backend/app'\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"csv\\\\|xlsx\\\\|export\" /f/Project/PharmaOps/frontend/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -r \"csv\\\\|xlsx\\\\|export\" /f/Project/PharmaOps/backend/src --include=*.py)",
+      "Bash(grep -E \"\\\\.ts$\")"
     ]
   }
 }

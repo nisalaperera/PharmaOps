@@ -1,0 +1,230 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# PharmaOps — GCP Cloud Run Deployment
+# Triggers on push to master branch.
+#
+# ── One-time GCP setup (run these in Cloud Shell or gcloud CLI) ───────────────
+#
+# 1. Enable required APIs:
+#    gcloud services enable \
+#      run.googleapis.com \
+#      artifactregistry.googleapis.com \
+#      iam.googleapis.com \
+#      iamcredentials.googleapis.com \
+#      --project=medi-guide-7008e
+#
+# 2. Create Artifact Registry repository:
+#    gcloud artifacts repositories create pharmaops \
+#      --repository-format=docker \
+#      --location=asia-south1 \
+#      --project=medi-guide-7008e
+#
+# 3. Create a Service Account for deployments:
+#    gcloud iam service-accounts create pharmaops-deployer \
+#      --display-name="PharmaOps GitHub Deployer" \
+#      --project=medi-guide-7008e
+#
+# 4. Grant the SA the required roles:
+#    SA="pharmaops-deployer@medi-guide-7008e.iam.gserviceaccount.com"
+#    PROJECT="medi-guide-7008e"
+#    for ROLE in \
+#      roles/run.admin \
+#      roles/artifactregistry.writer \
+#      roles/iam.serviceAccountUser; do
+#      gcloud projects add-iam-policy-binding $PROJECT \
+#        --member="serviceAccount:$SA" --role="$ROLE"
+#    done
+#
+# 5. Create Workload Identity Pool:
+#    gcloud iam workload-identity-pools create github-pool \
+#      --location=global \
+#      --display-name="GitHub Actions Pool" \
+#      --project=medi-guide-7008e
+#
+# 6. Create Workload Identity Provider for GitHub:
+#    gcloud iam workload-identity-pools providers create-oidc github-provider \
+#      --location=global \
+#      --workload-identity-pool=github-pool \
+#      --display-name="GitHub Provider" \
+#      --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
+#      --issuer-uri="https://token.actions.githubusercontent.com" \
+#      --project=medi-guide-7008e
+#
+# 7. Allow GitHub repo to impersonate the SA:
+#    REPO="nisalaperera/PharmaOps"
+#    POOL_ID=$(gcloud iam workload-identity-pools describe github-pool \
+#      --location=global --project=medi-guide-7008e --format="value(name)")
+#    gcloud iam service-accounts add-iam-policy-binding \
+#      "pharmaops-deployer@medi-guide-7008e.iam.gserviceaccount.com" \
+#      --role="roles/iam.workloadIdentityUser" \
+#      --member="principalSet://iam.googleapis.com/${POOL_ID}/attribute.repository/${REPO}" \
+#      --project=medi-guide-7008e
+#
+# 8. Get the provider resource name (use this value for WIF_PROVIDER secret):
+#    gcloud iam workload-identity-pools providers describe github-provider \
+#      --location=global \
+#      --workload-identity-pool=github-pool \
+#      --project=medi-guide-7008e \
+#      --format="value(name)"
+#
+# ── GitHub Secrets to configure (Settings → Secrets → Actions) ───────────────
+#
+# WIF_PROVIDER          — Workload Identity Provider resource name (from step 8)
+# WIF_SERVICE_ACCOUNT   — pharmaops-deployer@medi-guide-7008e.iam.gserviceaccount.com
+#
+# Backend secrets:
+# MONGODB_URL           — Full Firestore/MongoDB connection string
+# MONGODB_DB_NAME       — e.g. develop (or production)
+# JWT_SECRET            — Min 32-character random string
+# ALLOWED_ORIGINS       — Comma-separated, e.g. https://pharmaops-frontend-xxxx.run.app
+#
+# Frontend build-time secrets (baked into Next.js bundle):
+# NEXT_PUBLIC_API_URL               — Backend Cloud Run URL, e.g. https://pharmaops-backend-xxxx.run.app/api/v1
+# NEXT_PUBLIC_FIREBASE_API_KEY
+# NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+# NEXT_PUBLIC_FIREBASE_PROJECT_ID
+# NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+# NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+# NEXT_PUBLIC_FIREBASE_APP_ID
+#
+# Frontend runtime secrets (injected by Cloud Run at container start):
+# NEXTAUTH_URL          — Frontend Cloud Run URL, e.g. https://pharmaops-frontend-xxxx.run.app
+# NEXTAUTH_SECRET       — Min 32-character random string
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+env:
+  PROJECT_ID:       medi-guide-7008e
+  REGION:           asia-south1
+  REGISTRY:         asia-south1-docker.pkg.dev
+  AR_REPO:          pharmaops
+  BACKEND_SERVICE:  pharmaops-backend
+  FRONTEND_SERVICE: pharmaops-frontend
+
+jobs:
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+  deploy-backend:
+    name: Build & Deploy Backend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build & push backend image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/backend:${{ github.sha }}"
+          docker build -t "$IMAGE" ./backend
+          docker push "$IMAGE"
+
+      - name: Deploy backend to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.BACKEND_SERVICE }} \
+            --image="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/backend:${{ github.sha }}" \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --cpu=1 \
+            --memory=512Mi \
+            --min-instances=0 \
+            --max-instances=10 \
+            --timeout=60 \
+            --set-env-vars="\
+          MONGODB_DB_NAME=${{ secrets.MONGODB_DB_NAME }},\
+          JWT_ALGORITHM=HS256,\
+          JWT_EXPIRY_HOURS=8,\
+          APP_ENV=production,\
+          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}" \
+            --set-secrets="\
+          MONGODB_URL=pharmaops-mongodb-url:latest,\
+          JWT_SECRET=pharmaops-jwt-secret:latest" \
+            --project=${{ env.PROJECT_ID }}
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  deploy-frontend:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    needs: deploy-backend   # Ensures backend is live before frontend points to it
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account:            ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Build & push frontend image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/frontend:${{ github.sha }}"
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }} \
+            --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }} \
+            -t "$IMAGE" \
+            ./frontend
+          docker push "$IMAGE"
+
+      - name: Deploy frontend to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.FRONTEND_SERVICE }} \
+            --image="${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.AR_REPO }}/frontend:${{ github.sha }}" \
+            --region=${{ env.REGION }} \
+            --platform=managed \
+            --allow-unauthenticated \
+            --cpu=1 \
+            --memory=512Mi \
+            --min-instances=0 \
+            --max-instances=10 \
+            --timeout=60 \
+            --set-env-vars="\
+          NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }},\
+          NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }},\
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }},\
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }},\
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${{ secrets.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }},\
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }},\
+          NEXT_PUBLIC_FIREBASE_APP_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_APP_ID }},\
+          NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}" \
+            --set-secrets="\
+          NEXTAUTH_SECRET=pharmaops-nextauth-secret:latest" \
+            --project=${{ env.PROJECT_ID }}

@@ -1,10 +1,10 @@
 import sys, os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
 from dotenv import load_dotenv
 load_dotenv()
 
-from app.database import get_db, Collections, new_id
+from app.core.database import get_db, Collections, new_id
 from app.utils.password import hash_password
 from datetime import datetime, timezone
 
