@@ -125,6 +125,7 @@ export const navigationConfig: NavItem[] = [
     icon:         Receipt,
     requiredRole: "BRANCH_USER",
   },
+  
   {
     id:           "billing",
     label:        "Billing & Payments",
