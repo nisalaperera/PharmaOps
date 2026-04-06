@@ -47,8 +47,9 @@ const TOAST_TYPE_CONFIG = {
 // ─── Custom toast bar ─────────────────────────────────────────────────────────
 
 function CustomToastBar({ t, tokens }: { t: Toast; tokens: typeof THEME_TOKENS.light }) {
-  const type   = t.type === "blank" ? "success" : t.type;
-  const config = TOAST_TYPE_CONFIG[type] ?? TOAST_TYPE_CONFIG.success;
+  const rawType = t.type === "blank" ? "success" : t.type;
+  const type    = (rawType in TOAST_TYPE_CONFIG ? rawType : "success") as keyof typeof TOAST_TYPE_CONFIG;
+  const config  = TOAST_TYPE_CONFIG[type];
   const { Icon } = config;
 
   return (
