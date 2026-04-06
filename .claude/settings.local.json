@@ -22,7 +22,17 @@
       "Bash(xargs grep:*)",
       "Bash(grep -r \"csv\\\\|xlsx\\\\|export\" /f/Project/PharmaOps/frontend/src --include=*.ts --include=*.tsx)",
       "Bash(grep -r \"csv\\\\|xlsx\\\\|export\" /f/Project/PharmaOps/backend/src --include=*.py)",
-      "Bash(grep -E \"\\\\.ts$\")"
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(npm audit:*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('Total vulns:', d.get\\('metadata',{}\\).get\\('vulnerabilities',{}\\)\\); [print\\(k,':',v.get\\('severity'\\), v.get\\('fixAvailable'\\)\\) for k,v in list\\(d.get\\('vulnerabilities',{}\\).items\\(\\)\\)[:20]]\")",
+      "Bash(npm show:*)",
+      "Bash(python -c ':*)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('version:', d.get\\('version'\\)\\); print\\('exports:', list\\(d.get\\('exports', {}\\).keys\\(\\)\\)[:5]\\)\")",
+      "Bash(python:*)",
+      "Bash(npm install:*)",
+      "Bash(npm list:*)",
+      "Bash(npm run:*)",
+      "Bash(rm:*)"
     ]
   }
 }
