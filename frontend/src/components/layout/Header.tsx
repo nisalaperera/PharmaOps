@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Menu, Bell, ChevronDown, User, Settings, KeyRound } from "lucide-react";
+import { Menu, Bell, ChevronDown, User, Settings, KeyRound, CalendarCheck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
@@ -12,7 +12,8 @@ import { getInitials, getRoleLabel, cn } from "@/lib/utils";
 import { getRoleBadgeColor } from "@/lib/badges";
 import { apiGet } from "@/lib/api-client";
 import APP_CONFIG from "@/lib/config";
-import { ChangePasswordModal } from "@/app/(pages)/profile/components/ChangePasswordModal";
+import { ChangePasswordModal }  from "@/app/(pages)/profile/components/ChangePasswordModal";
+import { AttendanceModal }      from "@/app/(pages)/staff/attendance/components/AttendanceModal";
 import type { Branch } from "@/types";
 
 interface HeaderProps {
@@ -22,8 +23,9 @@ interface HeaderProps {
 
 export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
   const { user }    = useAuth();
-  const [dropdownOpen,       setDropdownOpen]       = useState(false);
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [dropdownOpen,        setDropdownOpen]        = useState(false);
+  const [changePasswordOpen,  setChangePasswordOpen]  = useState(false);
+  const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch branch name when user is assigned to a branch
@@ -87,8 +89,18 @@ export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right: theme toggle + notifications + user */}
+      {/* Right: attendance shortcut + theme toggle + notifications + user */}
       <div className="flex items-center gap-3">
+        <button
+          onClick={() => setAttendanceModalOpen(true)}
+          className="p-2 rounded-lg transition-colors hover:bg-[var(--color-surface-2)]"
+          style={{ color: "var(--color-text-muted)" }}
+          title="Record Attendance"
+          aria-label="Record Attendance"
+        >
+          <CalendarCheck className="w-5 h-5" />
+        </button>
+
         <ThemeToggle />
 
         {/* Notification bell */}
@@ -209,6 +221,12 @@ export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
         userId={user.id}
       />
     )}
+
+    <AttendanceModal
+      isOpen={attendanceModalOpen}
+      onClose={() => setAttendanceModalOpen(false)}
+      editingAttendance={null}
+    />
     </>
   );
 }

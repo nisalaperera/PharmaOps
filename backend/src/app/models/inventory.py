@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from app.models.common import TimestampMixin
+
+StockOutReason = Literal["DAMAGED", "EXPIRED", "OTHER"]
 
 
 class InventoryBatch(BaseModel):
@@ -29,8 +31,25 @@ class InventoryUpdate(BaseModel):
     min_stock_level: Optional[int] = Field(default=None, ge=0)
 
 
-class BatchAdjustment(BaseModel):
-    product_id:     str
+class StockInPayload(BaseModel):
     batch_number:   str
-    quantity_delta: int  # positive = add, negative = reduce
-    reason:         str
+    expiry_date:    str
+    quantity:       int   = Field(ge=1)
+    purchase_price: float = Field(ge=0)
+    selling_price:  float = Field(ge=0)
+    supplier_id:    Optional[str] = None
+    supplier_name:  Optional[str] = ""
+    notes:          Optional[str] = None
+
+
+class StockInCreatePayload(StockInPayload):
+    """Used when adding stock for a product that may not have an inventory record yet."""
+    product_id: str
+    branch_id:  Optional[str] = None
+
+
+class StockOutPayload(BaseModel):
+    batch_number: str
+    quantity:     int           = Field(ge=1)
+    reason:       StockOutReason
+    notes:        Optional[str] = None

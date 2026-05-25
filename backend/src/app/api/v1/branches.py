@@ -1,5 +1,6 @@
 import csv
 import io
+import re
 from fastapi import APIRouter, HTTPException, status, Depends, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
@@ -149,6 +150,7 @@ async def import_branches(
         )
 
     created: int       = 0
+    updated: int       = 0
     failed:  int       = 0
     errors:  list[dict] = []
 
@@ -177,34 +179,45 @@ async def import_branches(
             continue
 
         is_active = is_active_str not in ("FALSE", "0", "NO", "INACTIVE")
-
         now       = datetime.now(timezone.utc).isoformat()
-        branch_id = new_id()
+        existing  = db[Collections.BRANCHES].find_one(
+            {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}
+        )
 
-        db[Collections.BRANCHES].insert_one({
-            "_id":                    branch_id,
-            "name":                   name,
-            "address":                address,
-            "phone":                  phone,
-            "license_number":         license_number,
-            "is_active":              is_active,
-            "assigned_pharmacist_id": None,
-            "assigned_staff_ids":     [],
-            "operating_hours":        [],
-            "created_at":             now,
-            "updated_at":             now,
-            **audit_create_fields(current_user),
-        })
-        created += 1
+        if existing:
+            db[Collections.BRANCHES].update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"name": name, "address": address, "phone": phone,
+                           "license_number": license_number, "is_active": is_active,
+                           "updated_at": now}},
+            )
+            updated += 1
+        else:
+            branch_id = new_id()
+            db[Collections.BRANCHES].insert_one({
+                "_id":                    branch_id,
+                "name":                   name,
+                "address":                address,
+                "phone":                  phone,
+                "license_number":         license_number,
+                "is_active":              is_active,
+                "assigned_pharmacist_id": None,
+                "assigned_staff_ids":     [],
+                "operating_hours":        [],
+                "created_at":             now,
+                "updated_at":             now,
+                **audit_create_fields(current_user),
+            })
+            created += 1
 
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
         user_role=current_user["role"], action="IMPORT",
         resource="branch", resource_id="bulk",
-        details={"created": created, "failed": failed},
+        details={"created": created, "updated": updated, "failed": failed},
     )
 
-    return {"created": created, "failed": failed, "errors": errors}
+    return {"created": created, "updated": updated, "failed": failed, "errors": errors}
 
 
 @router.get("/{branch_id}", response_model=BranchResponse)

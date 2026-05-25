@@ -2,8 +2,9 @@ from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from app.models.common import TimestampMixin
 
-POStatus  = Literal["DRAFT","PENDING_APPROVAL","APPROVED","SENT","PARTIAL","RECEIVED","CANCELLED"]
-GRNStatus = Literal["PENDING","COMPLETED","PARTIAL"]
+POStatus                     = Literal["DRAFT","PENDING_APPROVAL","APPROVED","SENT","PARTIAL","RECEIVED","CANCELLED"]
+PurchaseInvoiceStatus        = Literal["PENDING","COMPLETED","PARTIAL"]
+PurchaseInvoicePaymentStatus = Literal["UNPAID","PARTIALLY_PAID","PAID"]
 
 
 class POItem(BaseModel):
@@ -32,19 +33,20 @@ class PurchaseOrderUpdate(BaseModel):
 
 
 class PurchaseOrderResponse(PurchaseOrderBase, TimestampMixin):
-    id:              str
-    supplier_name:   str = ""
-    channel_name:    str = ""
-    total_amount:    float = 0
-    status:          POStatus = "DRAFT"
-    created_by:      str
-    approved_by:     Optional[str] = None
-    approved_at:     Optional[str] = None
+    id:               str
+    supplier_name:    str = ""
+    channel_name:     str = ""
+    credit_term_days: int = 30
+    total_amount:     float = 0
+    status:           POStatus = "DRAFT"
+    created_by:       str
+    approved_by:      Optional[str] = None
+    approved_at:      Optional[str] = None
 
 
-# ─── GRN ─────────────────────────────────────────────────────────────────────
+# ─── Purchase Invoice (formerly GRN) ─────────────────────────────────────────
 
-class GRNItem(BaseModel):
+class PurchaseInvoiceItem(BaseModel):
     product_id:         str
     product_name:       str = ""
     ordered_quantity:   int
@@ -54,17 +56,40 @@ class GRNItem(BaseModel):
     unit_price:         float = Field(ge=0)
 
 
-class GRNCreate(BaseModel):
-    purchase_order_id:  str
-    branch_id:          str
-    supplier_id:        str
-    channel_id:         str
-    items:              list[GRNItem]
-    notes:              Optional[str] = None
+class PaymentEntry(BaseModel):
+    amount:         float = Field(ge=0)
+    payment_date:   str
+    payment_method: Literal["CASH","CARD","BANK_TRANSFER","CHEQUE"]
 
 
-class GRNResponse(GRNCreate, TimestampMixin):
-    id:           str
-    status:       GRNStatus = "PENDING"
-    received_by:  str
-    received_at:  str
+class PurchaseInvoiceCreate(BaseModel):
+    purchase_order_id:    str
+    branch_id:            str
+    supplier_id:          str
+    channel_id:           str
+    items:                list[PurchaseInvoiceItem]
+    invoice_date:         str
+    supplier_invoice_ref: Optional[str] = None
+    notes:                Optional[str] = None
+
+
+class PurchaseInvoiceResponse(PurchaseInvoiceCreate, TimestampMixin):
+    id:               str
+    invoice_number:   str = ""
+    status:           PurchaseInvoiceStatus        = "PENDING"
+    payment_status:   PurchaseInvoicePaymentStatus = "UNPAID"
+    payment_entries:  list[PaymentEntry]           = []
+    received_by:      str
+    received_at:      str
+    supplier_name:    str = ""
+    channel_name:     str = ""
+    credit_term_days: int = 30
+
+
+# ─── Backwards-compat aliases used by existing frontend/API code ──────────────
+GRNStatus = PurchaseInvoiceStatus
+GRNItem   = PurchaseInvoiceItem
+GRNCreate = PurchaseInvoiceCreate
+
+
+class GRNResponse(PurchaseInvoiceResponse): pass

@@ -5,9 +5,9 @@ from app.core.config import get_settings
 from app.core.database import get_db, Collections
 from app.api.v1 import (
     auth, users, branches, products, inventory,
-    suppliers, purchase_orders, sales, prescriptions,
-    patients, stock_transfer, staff, payroll,
-    reports, notifications, audit_log, preferences,
+    suppliers, purchase_orders, sales, sales_orders, prescriptions,
+    patients, customers, doctors, stock_transfer, staff, payroll,
+    reports, notifications, audit_log, preferences, billing, treasury, cheques, pos_machines,
 )
 
 settings = get_settings()
@@ -62,8 +62,12 @@ app.include_router(inventory.router,        prefix=API_PREFIX)
 app.include_router(suppliers.router,        prefix=API_PREFIX)
 app.include_router(purchase_orders.router,  prefix=API_PREFIX)
 app.include_router(sales.router,            prefix=API_PREFIX)
+app.include_router(sales_orders.router,     prefix=API_PREFIX)
 app.include_router(prescriptions.router,    prefix=API_PREFIX)
+app.include_router(billing.router,          prefix=API_PREFIX)
+app.include_router(customers.router,        prefix=API_PREFIX)
 app.include_router(patients.router,         prefix=API_PREFIX)
+app.include_router(doctors.router,          prefix=API_PREFIX)
 app.include_router(stock_transfer.router,   prefix=API_PREFIX)
 app.include_router(staff.router,            prefix=API_PREFIX)
 app.include_router(payroll.router,          prefix=API_PREFIX)
@@ -71,6 +75,9 @@ app.include_router(reports.router,          prefix=API_PREFIX)
 app.include_router(notifications.router,    prefix=API_PREFIX)
 app.include_router(audit_log.router,        prefix=API_PREFIX)
 app.include_router(preferences.router,      prefix=API_PREFIX)
+app.include_router(treasury.router,         prefix=API_PREFIX)
+app.include_router(cheques.router,          prefix=API_PREFIX)
+app.include_router(pos_machines.router,     prefix=API_PREFIX)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

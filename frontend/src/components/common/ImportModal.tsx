@@ -69,6 +69,7 @@ export function ImportModal({
     if (!selectedFile) return;
     setIsImporting(true);
     setImportError(null);
+    setResult(null);          // clear previous result so UI is clean during the new attempt
     try {
       const importResult = await onImport(selectedFile);
       setResult(importResult);
@@ -89,7 +90,8 @@ export function ImportModal({
     }
   }
 
-  const showDropZone = !result;
+  // Show drop zone when no result yet, or when validation failed and user needs to fix + re-upload
+  const showDropZone = !result || (result.created === 0 && result.updated === 0 && result.failed > 0);
 
   return (
     <Modal
@@ -102,7 +104,7 @@ export function ImportModal({
           <Button variant="secondary" onClick={handleClose}>
             {result ? "Close" : "Cancel"}
           </Button>
-          {!result && (
+          {(!result || (result.created === 0 && result.updated === 0 && result.failed > 0)) && (
             <Button
               variant="primary"
               leftIcon={<Upload className="w-4 h-4" />}
@@ -110,7 +112,7 @@ export function ImportModal({
               disabled={!selectedFile}
               isLoading={isImporting}
             >
-              Import
+              {result ? "Re-import" : "Import"}
             </Button>
           )}
         </div>
@@ -209,45 +211,72 @@ export function ImportModal({
         {/* Import result summary */}
         {result && (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                className="flex items-center gap-3 rounded-xl p-4"
-                style={{ background: "var(--color-surface-2)" }}
-              >
-                <CheckCircle className="w-5 h-5 flex-shrink-0 text-emerald-500" />
-                <div>
-                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Imported</p>
-                  <p className="text-2xl font-bold" style={{ color: "var(--color-text)" }}>
-                    {result.created}
-                  </p>
-                </div>
-              </div>
-              <div
-                className="flex items-center gap-3 rounded-xl p-4"
-                style={{ background: "var(--color-surface-2)" }}
-              >
-                <AlertCircle
-                  className={`w-5 h-5 flex-shrink-0 ${result.failed > 0 ? "text-danger-500" : "text-emerald-500"}`}
-                />
-                <div>
-                  <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Failed</p>
-                  <p
-                    className={`text-2xl font-bold ${result.failed > 0 ? "text-danger-600 dark:text-danger-400" : ""}`}
-                    style={result.failed === 0 ? { color: "var(--color-text)" } : undefined}
-                  >
-                    {result.failed}
-                  </p>
-                </div>
-              </div>
-            </div>
 
+            {/* Validation-failed banner — nothing was imported */}
+            {result.created === 0 && result.updated === 0 && result.failed > 0 && (
+              <div
+                className="flex items-start gap-2 rounded-xl p-3"
+                style={{ background: "var(--color-surface-2)" }}
+              >
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-danger-500" />
+                <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                  Validation failed — no records were imported. Fix the errors below and re-upload.
+                </p>
+              </div>
+            )}
+
+            {/* Counts — only show when at least some rows were processed successfully */}
+            {(result.created > 0 || result.updated > 0) && (
+              <div className={`grid gap-3 ${result.failed > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
+                <div
+                  className="flex items-center gap-3 rounded-xl p-4"
+                  style={{ background: "var(--color-surface-2)" }}
+                >
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 text-emerald-500" />
+                  <div>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Created</p>
+                    <p className="text-2xl font-bold" style={{ color: "var(--color-text)" }}>
+                      {result.created}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className="flex items-center gap-3 rounded-xl p-4"
+                  style={{ background: "var(--color-surface-2)" }}
+                >
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 text-blue-500" />
+                  <div>
+                    <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Updated</p>
+                    <p className="text-2xl font-bold" style={{ color: "var(--color-text)" }}>
+                      {result.updated}
+                    </p>
+                  </div>
+                </div>
+                {result.failed > 0 && (
+                  <div
+                    className="flex items-center gap-3 rounded-xl p-4"
+                    style={{ background: "var(--color-surface-2)" }}
+                  >
+                    <AlertCircle className="w-5 h-5 flex-shrink-0 text-danger-500" />
+                    <div>
+                      <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Failed</p>
+                      <p className="text-2xl font-bold text-danger-600 dark:text-danger-400">
+                        {result.failed}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Per-row validation errors */}
             {result.errors.length > 0 && (
               <div
-                className="rounded-xl p-3 max-h-52 overflow-y-auto space-y-2"
+                className="rounded-xl p-3 max-h-60 overflow-y-auto space-y-2"
                 style={{ background: "var(--color-surface-2)" }}
               >
-                <p className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>
-                  Row Errors
+                <p className="text-xs font-semibold mb-1" style={{ color: "var(--color-text)" }}>
+                  {result.errors.length} row{result.errors.length !== 1 ? "s" : ""} with errors
                 </p>
                 {result.errors.map((err, index) => (
                   <div key={index} className="flex items-start gap-2">
@@ -262,6 +291,24 @@ export function ImportModal({
                 ))}
               </div>
             )}
+
+            {/* Success — no errors at all */}
+            {(result.created > 0 || result.updated > 0) && result.failed === 0 && (
+              <div
+                className="flex items-center gap-2 rounded-xl p-3"
+                style={{ background: "var(--color-surface-2)" }}
+              >
+                <CheckCircle className="w-4 h-4 flex-shrink-0 text-emerald-500" />
+                <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+                  {result.created > 0 && result.updated > 0
+                    ? `${result.created} record${result.created !== 1 ? "s" : ""} created, ${result.updated} updated successfully.`
+                    : result.created > 0
+                    ? `All ${result.created} record${result.created !== 1 ? "s" : ""} imported successfully.`
+                    : `${result.updated} record${result.updated !== 1 ? "s" : ""} updated successfully.`}
+                </p>
+              </div>
+            )}
+
           </div>
         )}
 

@@ -190,6 +190,7 @@ async def import_users(
     valid_statuses = {"ACTIVE", "INACTIVE", "SUSPENDED"}
 
     created: int       = 0
+    updated: int       = 0
     failed:  int       = 0
     errors:  list[dict] = []
 
@@ -227,46 +228,59 @@ async def import_users(
                 failed += 1
                 continue
 
-        if db[Collections.USERS].find_one({"email": email}):
-            errors.append({"row": row_num, "message": f"Email '{email}' already registered"})
-            failed += 1
-            continue
-
-        if not password:
-            alphabet = string.ascii_letters + string.digits
-            password = "".join(secrets.choice(alphabet) for _ in range(12))
-
         if status_val not in valid_statuses:
             status_val = "ACTIVE"
 
-        now     = datetime.now(timezone.utc).isoformat()
-        user_id = new_id()
+        now      = datetime.now(timezone.utc).isoformat()
+        existing = db[Collections.USERS].find_one({"email": email})
 
-        db[Collections.USERS].insert_one({
-            "_id":           user_id,
-            "full_name":     full_name,
-            "email":         email,
-            "phone":         phone,
-            "role":          role,
-            "branch_id":     branch_id,
-            "status":        status_val,
-            "avatar_url":    None,
-            "password_hash": hash_password(password),
-            "last_login_at": None,
-            "created_at":    now,
-            "updated_at":    now,
-            **audit_create_fields(current_user),
-        })
-        created += 1
+        if existing:
+            update_fields: dict = {
+                "full_name":  full_name,
+                "phone":      phone,
+                "role":       role,
+                "branch_id":  branch_id,
+                "status":     status_val,
+                "updated_at": now,
+            }
+            if password:
+                update_fields["password_hash"] = hash_password(password)
+            db[Collections.USERS].update_one(
+                {"_id": existing["_id"]},
+                {"$set": update_fields},
+            )
+            updated += 1
+        else:
+            if not password:
+                alphabet = string.ascii_letters + string.digits
+                password = "".join(secrets.choice(alphabet) for _ in range(12))
+
+            user_id = new_id()
+            db[Collections.USERS].insert_one({
+                "_id":           user_id,
+                "full_name":     full_name,
+                "email":         email,
+                "phone":         phone,
+                "role":          role,
+                "branch_id":     branch_id,
+                "status":        status_val,
+                "avatar_url":    None,
+                "password_hash": hash_password(password),
+                "last_login_at": None,
+                "created_at":    now,
+                "updated_at":    now,
+                **audit_create_fields(current_user),
+            })
+            created += 1
 
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
         user_role=current_user["role"], action="IMPORT",
         resource="user", resource_id="bulk",
-        details={"created": created, "failed": failed},
+        details={"created": created, "updated": updated, "failed": failed},
     )
 
-    return {"created": created, "failed": failed, "errors": errors}
+    return {"created": created, "updated": updated, "failed": failed, "errors": errors}
 
 
 @router.get("/{user_id}", response_model=UserResponse)

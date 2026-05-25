@@ -86,7 +86,7 @@ export default function UsersPage() {
   const [isExportingCsv,    setIsExportingCsv]    = useState(false);
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
-    usePagination({ initialPageSize: 20, initialSortField: "full_name" });
+    usePagination({ initialSortField: "full_name" });
 
   const filters = {
     ...(roleFilter   && { role: roleFilter }),
@@ -489,7 +489,7 @@ export default function UsersPage() {
               pageSize={pagination.pageSize}
               onPageChange={goToPage}
               onPageSizeChange={changePageSize}
-              pageSizeOptions={[10, 20, 50]}
+
             />
           )}
         </div>

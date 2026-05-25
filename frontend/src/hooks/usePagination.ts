@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import type { PaginationConfig, SortConfig, SortDirection } from "@/types";
+import { DEFAULT_PAGE_SIZE } from "@/lib/constants";
 
 interface UsePaginationOptions {
   initialPage?:     number;
@@ -13,7 +14,7 @@ interface UsePaginationOptions {
 export function usePagination(options: UsePaginationOptions = {}) {
   const {
     initialPage          = 1,
-    initialPageSize      = 20,
+    initialPageSize      = DEFAULT_PAGE_SIZE,
     initialSortField     = "",
     initialSortDirection = "asc",
   } = options;

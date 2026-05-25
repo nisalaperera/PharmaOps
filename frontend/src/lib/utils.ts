@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { UserRole } from "@/types";
+import type { UserRole, ShiftType, EmploymentType } from "@/types";
 
 /** Tailwind class merger */
 export function cn(...inputs: ClassValue[]) {
@@ -121,6 +121,42 @@ export function generatePassword(): string {
   base[2] = rand(digits);
   base[3] = rand(special);
   return base.sort(() => Math.random() - 0.5).join("");
+}
+
+/** Shift type display label */
+export function getShiftTypeLabel(shiftType: ShiftType): string {
+  const labels: Record<ShiftType, string> = {
+    MORNING:  "Morning",
+    EVENING:  "Evening",
+    FULL_DAY: "Full Day",
+  };
+  return labels[shiftType] ?? shiftType;
+}
+
+/** Employment type display label */
+export function getEmploymentTypeLabel(type: EmploymentType): string {
+  const labels: Record<EmploymentType, string> = {
+    SALARIED: "Salaried",
+    HOURLY:   "Hourly",
+  };
+  return labels[type] ?? type;
+}
+
+/** Format a HH:MM time string to hh:mm a */
+export function formatTime(timeStr: string): string {
+  if (!timeStr) return "—";
+  const [hourStr, minuteStr = "00"] = timeStr.split(":");
+  const hour = parseInt(hourStr, 10);
+  if (isNaN(hour)) return timeStr;
+  const ampm = hour >= 12 ? "pm" : "am";
+  const h    = String(hour % 12 || 12).padStart(2, "0");
+  return `${h}:${minuteStr} ${ampm}`;
+}
+
+/** Build a staff display name: "EPF001 — Title First Last" (EPF prefix shown when available) */
+export function getStaffDisplayName(staff: { title?: string; first_name: string; last_name: string; epf_no?: string }): string {
+  const fullName = [staff.title, staff.first_name, staff.last_name].filter(Boolean).join(" ");
+  return staff.epf_no ? `${staff.epf_no} — ${fullName}` : fullName;
 }
 
 /** Format phone number as ### ### #### */

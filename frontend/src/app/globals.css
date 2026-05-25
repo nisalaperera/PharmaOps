@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
 @layer base {
   :root {
     --color-primary:      #008080;
@@ -174,7 +172,7 @@
 
   /* Sidebar link */
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+    @apply flex items-center justify-start gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-left
            transition-all duration-150 cursor-pointer select-none;
     color: var(--color-text-muted);
   }

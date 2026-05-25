@@ -1,37 +1,29 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Literal
 from app.models.common import TimestampMixin
 
-
-class FamilyMember(BaseModel):
-    id:            Optional[str] = None
-    name:          str
-    relationship:  str
-    date_of_birth: Optional[str] = None
+PatientRelationship = Literal["SELF", "SPOUSE", "CHILD", "PARENT", "SIBLING", "OTHER"]
 
 
 class PatientBase(BaseModel):
-    full_name:    str = Field(min_length=1, max_length=100)
-    phone:        str
-    email:        Optional[str] = None
+    customer_id:   str
+    name:          str = Field(min_length=1, max_length=100)
+    relationship:  PatientRelationship = "SELF"
     date_of_birth: Optional[str] = None
-    address:      Optional[str] = None
-    family_members: list[FamilyMember] = []
-    credit_limit: float = Field(default=0, ge=0)
+    is_active:     bool = True
 
 
-class PatientCreate(PatientBase): pass
+class PatientCreate(PatientBase):
+    pass
 
 
 class PatientUpdate(BaseModel):
-    full_name:      Optional[str] = None
-    phone:          Optional[str] = None
-    email:          Optional[str] = None
-    address:        Optional[str] = None
-    family_members: Optional[list[FamilyMember]] = None
-    credit_limit:   Optional[float] = None
+    name:          Optional[str]                 = None
+    relationship:  Optional[PatientRelationship] = None
+    date_of_birth: Optional[str]                = None
+    is_active:     Optional[bool]               = None
 
 
 class PatientResponse(PatientBase, TimestampMixin):
-    id:                  str
-    outstanding_balance: float = 0
+    id:            str
+    customer_name: str = ""

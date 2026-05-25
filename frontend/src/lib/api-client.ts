@@ -57,8 +57,17 @@ function createApiClient(): AxiosInstance {
   client.interceptors.response.use(
     (response) => response,
     (error) => {
-      const status  = error.response?.status;
-      const message = error.response?.data?.detail ?? error.message;
+      const status     = error.response?.status;
+      const rawDetail  = error.response?.data?.detail;
+      const message: string = Array.isArray(rawDetail)
+        ? rawDetail
+            .map((e: { msg?: string; loc?: unknown[] }) =>
+              [e.loc?.slice(-1)[0], e.msg].filter(Boolean).join(": ")
+            )
+            .join("; ")
+        : typeof rawDetail === "string"
+        ? rawDetail
+        : error.message;
 
       if (status === 401) {
         clearTokenCache();
@@ -126,7 +135,10 @@ export async function apiDownloadFile(
 export async function apiUploadFile<T>(url: string, file: File): Promise<T> {
   const formData = new FormData();
   formData.append("file", file);
-  const response = await apiClient.post<T>(url, formData);
+  const response = await apiClient.post<T>(url, formData, {
+    headers: { "Content-Type": undefined },
+    timeout: 300_000,
+  });
   return response.data;
 }
 

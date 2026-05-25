@@ -79,7 +79,7 @@ export default function BranchesPage() {
   const queryClient = useQueryClient();
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
-    usePagination({ initialPageSize: 20, initialSortField: "name" });
+    usePagination({ initialSortField: "name" });
 
   const filters = { ...(statusFilter && { is_active: statusFilter }) };
 
@@ -410,7 +410,7 @@ export default function BranchesPage() {
               pageSize={pagination.pageSize}
               onPageChange={goToPage}
               onPageSizeChange={changePageSize}
-              pageSizeOptions={[10, 20, 50]}
+
             />
           )}
         </div>

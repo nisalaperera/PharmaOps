@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PAGE_SIZE_OPTIONS } from "@/lib/constants";
 
 interface PaginationProps {
   currentPage:  number;
@@ -21,7 +22,7 @@ export function Pagination({
   pageSize,
   onPageChange,
   onPageSizeChange,
-  pageSizeOptions = [10, 20, 50, 100],
+  pageSizeOptions = PAGE_SIZE_OPTIONS,
   className,
 }: PaginationProps) {
   const startRecord = totalRecords === 0 ? 0 : (currentPage - 1) * pageSize + 1;

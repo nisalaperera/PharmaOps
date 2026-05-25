@@ -16,32 +16,40 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       className={cn(
-        "relative inline-flex items-center w-12 h-6 rounded-full transition-all duration-300",
+        "relative inline-flex items-center w-14 h-7 rounded-full transition-colors duration-300",
         "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2",
-        isDark
-          ? "bg-primary-600"
-          : "bg-slate-200 dark:bg-slate-700",
+        isDark ? "bg-slate-700" : "bg-amber-100",
         className
       )}
     >
-      {/* Track icons */}
-      <span className="absolute left-1 top-1/2 -translate-y-1/2 transition-opacity duration-200"
-            style={{ opacity: isDark ? 0 : 1 }}>
-        <Sun className="w-3 h-3 text-amber-500" />
-      </span>
-      <span className="absolute right-1 top-1/2 -translate-y-1/2 transition-opacity duration-200"
-            style={{ opacity: isDark ? 1 : 0 }}>
-        <Moon className="w-3 h-3 text-slate-100" />
-      </span>
+      {/* Sun icon — left side, visible in light mode */}
+      <Sun
+        className="absolute left-1.5 w-4 h-4 text-amber-500 transition-opacity duration-200"
+        style={{ opacity: isDark ? 0.3 : 1 }}
+      />
 
-      {/* Thumb */}
+      {/* Moon icon — right side, visible in dark mode */}
+      <Moon
+        className="absolute right-1.5 w-4 h-4 text-slate-400 transition-opacity duration-200"
+        style={{ opacity: isDark ? 1 : 0.3 }}
+      />
+
+      {/* Sliding thumb */}
       <span
         className={cn(
-          "w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300",
-          isDark ? "translate-x-6" : "translate-x-1"
+          "absolute flex items-center justify-center w-5 h-5 rounded-full shadow-md transition-all duration-300",
+          isDark
+            ? "translate-x-[34px] bg-slate-900"
+            : "translate-x-[2px] bg-white"
         )}
-      />
+      >
+        {isDark
+          ? <Moon className="w-3 h-3 text-primary-400" />
+          : <Sun  className="w-3 h-3 text-amber-500" />
+        }
+      </span>
     </button>
   );
 }

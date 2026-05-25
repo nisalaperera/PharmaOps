@@ -35,7 +35,7 @@ class Collections:
     GENERICS        = "product_generics"
     BRANDS          = "product_brands"
     CATEGORIES      = "product_categories"
-    UNITS           = "product_units"
+    SKUS            = "product_skus"
     INVENTORY       = "inventory"
     SUPPLIERS       = "suppliers"
     PURCHASE_ORDERS = "purchase_orders"
