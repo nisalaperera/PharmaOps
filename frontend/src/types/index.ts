@@ -177,6 +177,7 @@ export interface InventoryBatch {
   batch_number:   string;
   expiry_date:    string;
   quantity:       number;
+  sku:            string;
   purchase_price: number;
   selling_price:  number;
   supplier_id:    string;

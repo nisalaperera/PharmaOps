@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import { CategoryModal }          from "./components/CategoryModal";
 import { CategoryViewModal }      from "./components/CategoryViewModal";
 import type { ProductCategory, ImportResult } from "@/types";
 
-// ─── Tree helpers ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Tree helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CategoryTreeRow extends ProductCategory {
   depth: number;
@@ -46,7 +46,7 @@ function buildTree(categories: ProductCategory[]): CategoryTreeRow[] {
   return rows;
 }
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function exportDateStamp(): string {
   return new Date().toISOString().slice(0, 10);
@@ -64,7 +64,7 @@ function exportCategoriesCsv(categories: ProductCategory[]) {
 async function exportCategoriesPdf(categories: ProductCategory[]) {
   const doc     = new jsPDF();
   const headers = [["Category Name", "Parent", "Description"]];
-  const body    = categories.map((c) => [c.name, c.parent_name ?? "—", c.description ?? ""]);
+  const body    = categories.map((c) => [c.name, c.parent_name ?? "â€”", c.description ?? ""]);
 
   let cursorY = 14;
   try {
@@ -88,18 +88,18 @@ async function exportCategoriesPdf(categories: ProductCategory[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Categories Report — ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Categories Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
   doc.save(`categories_${exportDateStamp()}.pdf`);
 }
 
-// ─── Categories page ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Categories page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function CategoriesPage() {
   const { permissions } = useAuth();
-  const canManage       = permissions?.isAdmin || permissions?.isManager;
+  const canManage       = permissions?.can("BRANCH_MANAGER");
   const queryClient     = useQueryClient();
 
   const [statusFilter,     setStatusFilter]     = useState("");
@@ -125,7 +125,7 @@ export default function CategoriesPage() {
   function clearFilters() { setStatusFilter(""); goToPage(1); }
   function hideFilters()  { clearFilters(); setFilterVisible(false); }
 
-  // When searching/filtering — flat list; otherwise — depth-first tree order
+  // When searching/filtering â€” flat list; otherwise â€” depth-first tree order
   const treeRows = useMemo<CategoryTreeRow[]>(() => {
     const q = search.trim().toLowerCase();
     const statusFiltered = categories.filter((c) =>
@@ -149,7 +149,7 @@ export default function CategoriesPage() {
   const totalPages  = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
   const pagedRows   = treeRows.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize);
 
-  // ─── Selection ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
@@ -160,12 +160,12 @@ export default function CategoriesPage() {
   const selectedItems  = treeRows.filter((c) => selectedKeys.has(c.id));
   const selectionCount = selectedKeys.size;
 
-  // ─── Export ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function handleExportCsv()      { exportCategoriesCsv(selectionCount > 0 ? selectedItems : treeRows); }
   async function handleExportPdf() { await exportCategoriesPdf(selectedItems); }
 
-  // ─── Toggle status mutation ──────────────────────────────────────────────────
+  // â”€â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleStatusMutation = useMutation({
     mutationFn: (category: ProductCategory) =>
@@ -186,7 +186,7 @@ export default function CategoriesPage() {
     },
   });
 
-  // ─── Import ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleImport(file: File): Promise<ImportResult> {
     const result = await apiUploadFile<ImportResult>("/products/categories/import", file);
@@ -199,7 +199,7 @@ export default function CategoriesPage() {
     downloadBlob(blob, "categories_import_template.csv");
   }
 
-  // ─── Columns ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const columns: Column<CategoryTreeRow>[] = [
     {
@@ -221,7 +221,7 @@ export default function CategoriesPage() {
       header: "Parent",
       render: (row) => (
         <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.parent_name || "—"}
+          {row.parent_name || "â€”"}
         </span>
       ),
     },
@@ -230,7 +230,7 @@ export default function CategoriesPage() {
       header: "Description",
       render: (row) => (
         <p className="text-sm truncate max-w-[360px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "—"}
+          {row.description || "â€”"}
         </p>
       ),
     },
@@ -313,7 +313,7 @@ export default function CategoriesPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search categories…"
+            placeholder="Search categoriesâ€¦"
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -476,3 +476,5 @@ export default function CategoriesPage() {
     </div>
   );
 }
+
+

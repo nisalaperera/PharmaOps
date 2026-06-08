@@ -9,6 +9,7 @@ class InventoryBatch(BaseModel):
     batch_number:   str
     expiry_date:    str
     quantity:       int = Field(ge=0)
+    sku:            str = ""
     purchase_price: float = Field(ge=0)
     selling_price:  float = Field(ge=0)
     supplier_id:    str
@@ -35,6 +36,7 @@ class StockInPayload(BaseModel):
     batch_number:   str
     expiry_date:    str
     quantity:       int   = Field(ge=1)
+    sku:            Optional[str] = None
     purchase_price: float = Field(ge=0)
     selling_price:  float = Field(ge=0)
     supplier_id:    Optional[str] = None

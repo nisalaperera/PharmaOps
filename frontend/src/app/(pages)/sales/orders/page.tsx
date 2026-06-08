@@ -368,7 +368,7 @@ export default function SalesOrdersPage() {
         onClose={() => setConfirmingOrder(null)}
         onConfirm={() => confirmingOrder && confirmMutation.mutate(confirmingOrder.id)}
         title="Confirm Order"
-        message={`Confirm sales order #${confirmingOrder?.id.slice(-8).toUpperCase()}? Status will change from Draft to Confirmed.`}
+        body={`Confirm sales order #${confirmingOrder?.id.slice(-8).toUpperCase()}? Status will change from Draft to Confirmed.`}
         confirmLabel="Confirm Order"
         isLoading={confirmMutation.isPending}
       />
@@ -378,7 +378,7 @@ export default function SalesOrdersPage() {
         onClose={() => setCancellingOrder(null)}
         onConfirm={() => cancellingOrder && cancelMutation.mutate(cancellingOrder.id)}
         title="Cancel Order"
-        message={`Cancel sales order #${cancellingOrder?.id.slice(-8).toUpperCase()}? This action cannot be undone.`}
+        body={`Cancel sales order #${cancellingOrder?.id.slice(-8).toUpperCase()}? This action cannot be undone.`}
         confirmLabel="Cancel Order"
         variant="danger"
         isLoading={cancelMutation.isPending}

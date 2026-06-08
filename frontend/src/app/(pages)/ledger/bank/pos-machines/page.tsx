@@ -373,7 +373,7 @@ export default function PosMachinesPage() {
         isOpen={!!confirmToggle}
         onClose={() => setConfirmToggle(null)}
         title={isDeactivating ? "Deactivate POS Machine" : "Activate POS Machine"}
-        message={
+        body={
           isDeactivating
             ? `Deactivate TID ${confirmToggle?.terminal_id}? No new transactions can be logged on an inactive machine.`
             : `Activate TID ${confirmToggle?.terminal_id}?`

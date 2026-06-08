@@ -32,8 +32,6 @@ export function PosMachineModal({ isOpen, onClose, editingMachine }: PosMachineM
     defaultValues: { terminal_id: "", merchant_id: "", notes: "" },
   });
 
-  const form = isEditing ? editForm : createForm;
-
   useEffect(() => {
     if (!isOpen) return;
     if (isEditing && editingMachine) {
@@ -76,7 +74,9 @@ export function PosMachineModal({ isOpen, onClose, editingMachine }: PosMachineM
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? "Edit POS Machine" : "Add POS Machine"} size="md">
       <form
-        onSubmit={form.handleSubmit((v) => mutation.mutate(v as PosMachineValues & PosMachineUpdateValues))}
+        onSubmit={isEditing
+          ? editForm.handleSubmit((v) => mutation.mutate(v))
+          : createForm.handleSubmit((v) => mutation.mutate(v))}
         className="space-y-4"
       >
         {!isEditing && (
@@ -107,8 +107,8 @@ export function PosMachineModal({ isOpen, onClose, editingMachine }: PosMachineM
           </label>
           <Input
             placeholder="e.g. TID-001"
-            {...form.register("terminal_id")}
-            error={form.formState.errors.terminal_id?.message}
+            {...(isEditing ? editForm.register("terminal_id") : createForm.register("terminal_id"))}
+            error={isEditing ? editForm.formState.errors.terminal_id?.message : createForm.formState.errors.terminal_id?.message}
           />
         </div>
 
@@ -119,7 +119,7 @@ export function PosMachineModal({ isOpen, onClose, editingMachine }: PosMachineM
           </label>
           <Input
             placeholder="e.g. MID-123456"
-            {...form.register("merchant_id")}
+            {...(isEditing ? editForm.register("merchant_id") : createForm.register("merchant_id"))}
           />
         </div>
 
@@ -129,7 +129,7 @@ export function PosMachineModal({ isOpen, onClose, editingMachine }: PosMachineM
             <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>(optional)</span>
           </label>
           <textarea
-            {...form.register("notes")}
+            {...(isEditing ? editForm.register("notes") : createForm.register("notes"))}
             rows={2}
             className="form-input w-full resize-none"
             placeholder="Any notes about this POS machine…"

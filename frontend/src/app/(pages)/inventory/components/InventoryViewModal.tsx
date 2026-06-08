@@ -101,7 +101,7 @@ export function InventoryViewModal({
               <table className="w-full text-xs whitespace-nowrap">
                 <thead>
                   <tr style={{ background: "var(--color-surface-2)" }}>
-                    {["Batch #", "Expiry", "Qty", "Purchase", "Selling", "Supplier", "Received"].map((h) => (
+                    {["Batch #", "Expiry", "SKU", "Qty", "Purchase", "Selling", "Supplier", "Received"].map((h) => (
                       <th
                         key={h}
                         className="px-3 py-2 text-left font-medium"
@@ -137,6 +137,9 @@ export function InventoryViewModal({
                           >
                             {batch.expiry_date}
                           </span>
+                        </td>
+                        <td className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
+                          {batch.sku || "—"}
                         </td>
                         <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text)" }}>
                           {batch.quantity.toLocaleString()}

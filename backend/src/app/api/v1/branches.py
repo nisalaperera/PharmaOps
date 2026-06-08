@@ -19,7 +19,7 @@ BRANCH_SORT_FIELDS = {"name", "created_at"}
 @router.get("", response_model=PaginatedResponse[BranchResponse])
 async def list_branches(
     page:      int  = Query(default=1, ge=1),
-    page_size: int  = Query(default=20, ge=1, le=100),
+    page_size: int  = Query(default=20, ge=1, le=500),
     search:    str | None  = Query(default=None),
     is_active: bool | None = Query(default=None),
     sort_by:   str | None  = Query(default="name"),

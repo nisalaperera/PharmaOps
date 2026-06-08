@@ -7,10 +7,10 @@
     --color-primary:      #008080;
     --color-navy:         #004B79;
     --color-danger:       #ED1B2E;
-    --color-bg:           #f8fafc;
-    --color-surface:      #ffffff;
-    --color-surface-2:    #f1f5f9;
-    --color-border:       #e2e8f0;
+    --color-bg:           #eaf4f4;
+    --color-surface:      #f4fbfb;
+    --color-surface-2:    #daeaea;
+    --color-border:       #b6d0d0;
     --color-text:         #0f172a;
     --color-text-muted:   #64748b;
     --color-text-inverse: #ffffff;
@@ -19,7 +19,7 @@
     --header-height:      64px;
 
     /* Table row states */
-    --color-table-header:   #e8eef4;
+    --color-table-header:   #cce0e0;
     --color-table-hover:    rgba(0, 128, 128, 0.05);
     --color-table-selected: rgba(0, 128, 128, 0.10);
   }

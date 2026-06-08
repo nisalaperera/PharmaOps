@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -27,7 +27,7 @@ import { ProductModal }             from "./components/ProductModal";
 import { ProductViewModal }         from "./components/ProductViewModal";
 import type { Product, ProductCategory, ProductBrand, ProductGeneric, ProductSku, PaginatedResponse, ImportResult } from "@/types";
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const CSV_HEADERS = [
   "name", "generic_name", "brand_name", "category_name", "basic_sku_name",
@@ -86,7 +86,7 @@ function exportSelectedPdf(selectedProducts: Product[]) {
   } catch { /* skip logo if load fails */ }
 
   doc.setFontSize(13);
-  doc.text(`${APP_CONFIG.orgName} — Product Catalog`, 28, yPos + 4);
+  doc.text(`${APP_CONFIG.orgName} â€” Product Catalog`, 28, yPos + 4);
   doc.setFontSize(9);
   doc.setTextColor(120);
   doc.text(`Exported: ${new Date().toISOString().slice(0, 10)}`, 28, yPos + 10);
@@ -98,11 +98,11 @@ function exportSelectedPdf(selectedProducts: Product[]) {
   doc.save(`products_${today}.pdf`);
 }
 
-// ─── Products page ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Products page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ProductsPage() {
   const { permissions } = useAuth();
-  const canManage       = permissions?.isAdmin || permissions?.isManager;
+  const canManage       = permissions?.can("BRANCH_MANAGER");
 
   const [statusFilter,   setStatusFilter]   = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -150,7 +150,7 @@ export default function ProductsPage() {
 
   function hideFilters() { clearFilters(); setFilterVisible(false); }
 
-  // ─── Queries ────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Queries â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const { data, isLoading, isFetching } = useQuery<PaginatedResponse<Product>>({
     queryKey: ["products", queryParams, filters],
@@ -186,7 +186,7 @@ export default function ProductsPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  // ─── Toggle status mutation ──────────────────────────────────────────────────
+  // â”€â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleStatusMutation = useMutation({
     mutationFn: (product: Product) =>
@@ -207,7 +207,7 @@ export default function ProductsPage() {
     },
   });
 
-  // ─── Selection helpers ───────────────────────────────────────────────────────
+  // â”€â”€â”€ Selection helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
@@ -224,7 +224,7 @@ export default function ProductsPage() {
   const selectedProducts = products.filter((p) => selectedKeys.has(p.id));
   const selectionCount   = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // ─── Export ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleExportCsv() {
     if (allPagesSelected) {
@@ -261,7 +261,7 @@ export default function ProductsPage() {
     downloadBlob(blob, "products_import_template.csv");
   }
 
-  // ─── Columns ────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const columns: Column<Product>[] = [
     {
@@ -280,7 +280,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.generic_name || "—"}
+          {row.generic_name || "â€”"}
         </span>
       ),
     },
@@ -290,7 +290,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.brand_name || "—"}
+          {row.brand_name || "â€”"}
         </span>
       ),
     },
@@ -300,7 +300,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.category_name || "—"}
+          {row.category_name || "â€”"}
         </span>
       ),
     },
@@ -312,7 +312,7 @@ export default function ProductsPage() {
           className="text-xs font-mono px-2 py-0.5 rounded"
           style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
         >
-          {row.basic_sku_name || "—"}
+          {row.basic_sku_name || "â€”"}
         </span>
       ),
     },
@@ -411,7 +411,7 @@ export default function ProductsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search by name, barcode, generic, brand or category…"
+            placeholder="Search by name, barcode, generic, brand or categoryâ€¦"
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />
@@ -609,7 +609,7 @@ export default function ProductsPage() {
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required: name, generic_name, brand_name, category_name, basic_sku_name. Optional: barcode, specific_instructions, is_active (TRUE/FALSE). SKU mappings: sku_map_N_sku, sku_map_N_mapped_to, sku_map_N_qty (N = 1, 2, …)."
+        templateNote="Required: name, generic_name, brand_name, category_name, basic_sku_name. Optional: barcode, specific_instructions, is_active (TRUE/FALSE). SKU mappings: sku_map_N_sku, sku_map_N_mapped_to, sku_map_N_qty (N = 1, 2, â€¦)."
       />
 
       <ConfirmModal
@@ -643,3 +643,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+

@@ -5,9 +5,10 @@ import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Trash2 } from "lucide-react";
-import { Modal }   from "@/components/ui/Modal";
-import { Button }  from "@/components/ui/Button";
-import { Input }   from "@/components/ui/Input";
+import { Modal }        from "@/components/ui/Modal";
+import { Button }       from "@/components/ui/Button";
+import { Input }        from "@/components/ui/Input";
+import { Autocomplete } from "@/components/ui/Autocomplete";
 import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { showToast }                 from "@/lib/toast";
 import { useAuth }                   from "@/hooks/useAuth";
@@ -200,62 +201,40 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
 
           {/* Supplier */}
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text)" }}>
-              Supplier <span className="text-danger-500">*</span>
-            </label>
             <Controller
               name="supplier_id"
               control={form.control}
               render={({ field }) => (
-                <select
-                  {...field}
-                  className="form-select w-full"
-                  onChange={(e) => { field.onChange(e); }}
-                >
-                  <option value="">Select supplier…</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.short_name}</option>
-                  ))}
-                </select>
+                <Autocomplete
+                  label={<>Supplier <span className="text-danger-500">*</span></>}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={suppliers.map((s) => ({ value: s.id, label: s.short_name }))}
+                  placeholder="Search supplier…"
+                  isLoading={isOpen && !suppliersData}
+                  error={form.formState.errors.supplier_id?.message}
+                />
               )}
             />
-            {form.formState.errors.supplier_id && (
-              <p className="text-xs text-danger-500 mt-1">
-                {form.formState.errors.supplier_id.message}
-              </p>
-            )}
           </div>
 
           {/* Channel — depends on selected supplier */}
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text)" }}>
-              Channel <span className="text-danger-500">*</span>
-            </label>
             <Controller
               name="channel_id"
               control={form.control}
               render={({ field }) => (
-                <select
-                  {...field}
-                  className="form-select w-full"
-                  disabled={channelOptions.length === 0}
-                >
-                  <option value="">
-                    {watchedSupplierId ? "Select channel…" : "Select supplier first"}
-                  </option>
-                  {channelOptions.map((ch, idx) => (
-                    <option key={ch.id ?? idx} value={ch.id ?? String(idx)}>
-                      {ch.channel_name}
-                    </option>
-                  ))}
-                </select>
+                <Autocomplete
+                  label={<>Channel <span className="text-danger-500">*</span></>}
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={channelOptions.map((ch, idx) => ({ value: ch.id ?? String(idx), label: ch.channel_name }))}
+                  placeholder={watchedSupplierId ? "Search channel…" : "Select supplier first"}
+                  disabled={!watchedSupplierId}
+                  error={form.formState.errors.channel_id?.message}
+                />
               )}
             />
-            {form.formState.errors.channel_id && (
-              <p className="text-xs text-danger-500 mt-1">
-                {form.formState.errors.channel_id.message}
-              </p>
-            )}
           </div>
 
           {/* Notes */}
@@ -323,25 +302,16 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
                   className="grid gap-2 items-start"
                   style={{ gridTemplateColumns: "2fr 80px 110px 100px 32px" }}
                 >
-                  {/* Product select */}
+                  {/* Product autocomplete */}
                   <div>
-                    <select
-                      className="form-select w-full text-sm"
+                    <Autocomplete
                       value={form.watch(`items.${index}.product_id`)}
-                      onChange={(e) => handleProductSelect(index, e.target.value)}
-                    >
-                      <option value="">Select product…</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    {form.formState.errors.items?.[index]?.product_id && (
-                      <p className="text-xs text-danger-500 mt-0.5">
-                        {form.formState.errors.items[index]?.product_id?.message}
-                      </p>
-                    )}
+                      onChange={(productId) => handleProductSelect(index, productId)}
+                      options={products.map((p) => ({ value: p.id, label: p.name }))}
+                      placeholder="Search product…"
+                      isLoading={isOpen && !productsData}
+                      error={form.formState.errors.items?.[index]?.product_id?.message}
+                    />
                   </div>
 
                   {/* Quantity */}

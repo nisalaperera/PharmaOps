@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import { BrandModal }             from "./components/BrandModal";
 import { BrandViewModal }         from "./components/BrandViewModal";
 import type { ProductBrand, ImportResult } from "@/types";
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildBrandRow(brand: ProductBrand): string[] {
   return [brand.name, brand.manufacturer_name ?? ""];
@@ -59,7 +59,7 @@ async function exportBrandsPdf(brands: ProductBrand[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal — continue without it.
+    // Logo load failure is non-fatal â€” continue without it.
   }
 
   doc.setFontSize(13);
@@ -69,18 +69,18 @@ async function exportBrandsPdf(brands: ProductBrand[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Brands Report — ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Brands Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
   doc.save(`brands_${exportDateStamp()}.pdf`);
 }
 
-// ─── Brands page ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Brands page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function BrandsPage() {
   const { permissions } = useAuth();
-  const canManage       = permissions?.isAdmin || permissions?.isManager;
+  const canManage       = permissions?.can("BRANCH_MANAGER");
   const queryClient     = useQueryClient();
 
   const [statusFilter,     setStatusFilter]     = useState("");
@@ -131,7 +131,7 @@ export default function BrandsPage() {
   const totalPages  = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
   const pagedBrands = filteredBrands.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize);
 
-  // ─── Selection ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
@@ -148,7 +148,7 @@ export default function BrandsPage() {
   const selectedItems  = filteredBrands.filter((b) => selectedKeys.has(b.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // ─── Export ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function handleExportCsv() {
     exportBrandsCsv(allPagesSelected ? filteredBrands : selectedItems);
@@ -158,7 +158,7 @@ export default function BrandsPage() {
     await exportBrandsPdf(selectedItems);
   }
 
-  // ─── Toggle status mutation ──────────────────────────────────────────────────
+  // â”€â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleStatusMutation = useMutation({
     mutationFn: (brand: ProductBrand) =>
@@ -179,7 +179,7 @@ export default function BrandsPage() {
     },
   });
 
-  // ─── Import ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleImport(file: File): Promise<ImportResult> {
     const result = await apiUploadFile<ImportResult>("/products/brands/import", file);
@@ -192,7 +192,7 @@ export default function BrandsPage() {
     downloadBlob(blob, "brands_import_template.csv");
   }
 
-  // ─── Columns ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const columns: Column<ProductBrand>[] = [
     {
@@ -211,7 +211,7 @@ export default function BrandsPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.manufacturer_name || "—"}
+          {row.manufacturer_name || "â€”"}
         </p>
       ),
     },
@@ -296,7 +296,7 @@ export default function BrandsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search brands…"
+            placeholder="Search brandsâ€¦"
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -493,3 +493,5 @@ export default function BrandsPage() {
     </div>
   );
 }
+
+

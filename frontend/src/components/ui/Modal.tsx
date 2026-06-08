@@ -72,7 +72,7 @@ export function Modal({
           sizeClasses[size],
           className
         )}
-        style={{ background: "var(--color-surface)" }}
+        style={{ background: "var(--color-bg)" }}
         role="dialog"
         aria-modal="true"
       >

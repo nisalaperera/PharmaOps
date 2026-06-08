@@ -14,11 +14,12 @@ import { purchaseInvoiceCreateSchema, type PurchaseInvoiceCreateValues } from ".
 import type { PurchaseInvoice, PurchaseOrder, PaginatedResponse } from "@/types";
 
 interface PurchaseInvoiceModalProps {
-  isOpen:  boolean;
-  onClose: () => void;
+  isOpen:       boolean;
+  onClose:      () => void;
+  defaultPOId?: string | null;
 }
 
-export function PurchaseInvoiceModal({ isOpen, onClose }: PurchaseInvoiceModalProps) {
+export function PurchaseInvoiceModal({ isOpen, onClose, defaultPOId }: PurchaseInvoiceModalProps) {
   const queryClient = useQueryClient();
 
   const form = useForm<PurchaseInvoiceCreateValues>({
@@ -86,7 +87,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose }: PurchaseInvoiceModalPr
   useEffect(() => {
     if (!isOpen) return;
     form.reset({
-      purchase_order_id:    "",
+      purchase_order_id:    defaultPOId ?? "",
       branch_id:            "",
       supplier_id:          "",
       channel_id:           "",
@@ -119,28 +120,30 @@ export function PurchaseInvoiceModal({ isOpen, onClose }: PurchaseInvoiceModalPr
       <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-6">
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2 sm:max-w-md">
-            <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text)" }}>
-              Purchase Order <span className="text-danger-500">*</span>
-            </label>
-            <Controller
-              name="purchase_order_id"
-              control={form.control}
-              render={({ field }) => (
-                <select {...field} className="form-select w-full">
-                  <option value="">Select an approved purchase order…</option>
-                  {receivablePOs.map((po) => (
-                    <option key={po.id} value={po.id}>
-                      #{po.id.slice(0, 8).toUpperCase()} — {po.supplier_name} ({po.status})
-                    </option>
-                  ))}
-                </select>
+          {!defaultPOId && (
+            <div className="sm:col-span-2 sm:max-w-md">
+              <label className="block text-sm font-medium mb-1" style={{ color: "var(--color-text)" }}>
+                Purchase Order <span className="text-danger-500">*</span>
+              </label>
+              <Controller
+                name="purchase_order_id"
+                control={form.control}
+                render={({ field }) => (
+                  <select {...field} className="form-select w-full">
+                    <option value="">Select an approved purchase order…</option>
+                    {receivablePOs.map((po) => (
+                      <option key={po.id} value={po.id}>
+                        #{po.id.slice(0, 8).toUpperCase()} — {po.supplier_name} ({po.status})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              />
+              {form.formState.errors.purchase_order_id && (
+                <p className="text-xs text-danger-500 mt-1">{form.formState.errors.purchase_order_id.message}</p>
               )}
-            />
-            {form.formState.errors.purchase_order_id && (
-              <p className="text-xs text-danger-500 mt-1">{form.formState.errors.purchase_order_id.message}</p>
-            )}
-          </div>
+            </div>
+          )}
 
           {selectedPO && (
             <div

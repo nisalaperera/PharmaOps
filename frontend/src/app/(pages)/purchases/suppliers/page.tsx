@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -27,7 +27,7 @@ import { SupplierViewModal }       from "./components/SupplierViewModal";
 import { ChannelManagementModal }  from "./components/ChannelManagementModal";
 import type { Supplier, SupplierType, PaginatedResponse, ImportResult } from "@/types";
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function exportDateStamp(): string {
   return format(new Date(), "yyyy-MM-dd");
@@ -87,25 +87,25 @@ async function exportSelectedPdf(selected: Supplier[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Supplier Report — " + exportDateStamp(), 14, cursorY + 4);
+  doc.text("Supplier Report â€” " + exportDateStamp(), 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
   doc.save(`suppliers_${exportDateStamp()}.pdf`);
 }
 
-// ─── Page component ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Page component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function SuppliersPage() {
   const { permissions } = useAuth();
-  const canManage = (permissions?.isAdmin || permissions?.isManager) ?? false;
+  const canManage = (permissions?.can("BRANCH_MANAGER")) ?? false;
 
-  // — Filters
+  // â€” Filters
   const [statusFilter,       setStatusFilter]       = useState("");
   const [supplierTypeFilter, setSupplierTypeFilter] = useState<SupplierType | "">("");
   const [filterVisible,      setFilterVisible]      = useState(false);
 
-  // — Modal state
+  // â€” Modal state
   const [modalOpen,          setModalOpen]          = useState(false);
   const [editingSupplier,    setEditingSupplier]    = useState<Supplier | null>(null);
   const [viewSupplier,       setViewSupplier]       = useState<Supplier | null>(null);
@@ -113,12 +113,12 @@ export default function SuppliersPage() {
   const [confirmSupplier,    setConfirmSupplier]    = useState<Supplier | null>(null);
   const [importOpen,         setImportOpen]         = useState(false);
 
-  // — Row selection + export
+  // â€” Row selection + export
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
-  // — Pagination
+  // â€” Pagination
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "short_name" });
 
@@ -141,7 +141,7 @@ export default function SuppliersPage() {
     setFilterVisible(false);
   }
 
-  // — Data
+  // â€” Data
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<PaginatedResponse<Supplier>>({
@@ -154,7 +154,7 @@ export default function SuppliersPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  // — Toggle status mutation
+  // â€” Toggle status mutation
   const toggleStatusMutation = useMutation({
     mutationFn: (supplier: Supplier) =>
       apiPatch<Supplier>(`/suppliers/${supplier.id}`, { is_active: !supplier.is_active }),
@@ -174,7 +174,7 @@ export default function SuppliersPage() {
     },
   });
 
-  // — Selection helpers
+  // â€” Selection helpers
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
     setAllPagesSelected(false);
@@ -190,7 +190,7 @@ export default function SuppliersPage() {
   const selectedItems  = items.filter((i) => selectedKeys.has(i.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // — Export handlers
+  // â€” Export handlers
   async function handleExportCsv() {
     if (allPagesSelected) {
       setIsExportingCsv(true);
@@ -226,7 +226,7 @@ export default function SuppliersPage() {
     downloadBlob(blob, "suppliers_import_template.csv");
   }
 
-  // — Columns
+  // â€” Columns
   const columns: Column<Supplier>[] = [
     {
       key:      "short_name",
@@ -328,7 +328,7 @@ export default function SuppliersPage() {
   return (
     <div className="page-container">
 
-      {/* ── Page header ───────────────────────────────────────────────────── */}
+      {/* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export default function SuppliersPage() {
           </Button>
 
           <SearchBar
-            placeholder="Search by name or registration…"
+            placeholder="Search by name or registrationâ€¦"
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />
@@ -383,7 +383,7 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      {/* ── Filter bar ────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Filter bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <FilterBar isVisible={filterVisible} hasActiveFilters={hasActiveFilters} onClear={clearFilters} onHide={hideFilters}>
         <select
           value={supplierTypeFilter}
@@ -406,7 +406,7 @@ export default function SuppliersPage() {
         </select>
       </FilterBar>
 
-      {/* ── Table card ────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Table card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
 
         {showSelectAllBanner && (
@@ -499,7 +499,7 @@ export default function SuppliersPage() {
         )}
       </div>
 
-      {/* ── Modals ────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <SupplierModal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingSupplier(null); }}
@@ -554,3 +554,4 @@ export default function SuppliersPage() {
     </div>
   );
 }
+

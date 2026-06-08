@@ -40,7 +40,7 @@ async def list_purchase_orders(
     status:     str | None = Query(default=None),
     search:     str | None = Query(default=None),
     page:       int = Query(default=1, ge=1),
-    page_size:  int = Query(default=20, ge=1, le=100),
+    page_size:  int = Query(default=20, ge=1, le=500),
     sort_by:    str | None = Query(default="created_at"),
     sort_dir:   str | None = Query(default="desc"),
     current_user: dict = Depends(get_current_user),

@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   ShoppingCart, Plus, Eye, Pencil, SlidersHorizontal,
-  FileDown, FileText, Send, CheckCircle2, Ban,
+  FileDown, FileText, Send, CheckCircle2, Ban, Receipt,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -25,6 +25,7 @@ import { PO_STATUS_LABEL, PO_STATUS_VARIANT } from "@/lib/badges";
 import APP_CONFIG                 from "@/lib/config";
 import { POModal }                from "./components/POModal";
 import { POViewModal }            from "./components/POViewModal";
+import { PurchaseInvoiceModal }   from "../invoices/components/PurchaseInvoiceModal";
 import type { PurchaseOrder, Branch, PaginatedResponse } from "@/types";
 
 // ─── Export helpers ───────────────────────────────────────────────────────────
@@ -144,6 +145,7 @@ export default function PurchaseOrdersPage() {
   const [modalOpen,     setModalOpen]     = useState(false);
   const [editingPO,     setEditingPO]     = useState<PurchaseOrder | null>(null);
   const [viewPO,        setViewPO]        = useState<PurchaseOrder | null>(null);
+  const [convertPO,     setConvertPO]     = useState<PurchaseOrder | null>(null);
   const [pendingAction, setPendingAction] = useState<{ po: PurchaseOrder; type: POAction } | null>(null);
 
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
@@ -354,6 +356,16 @@ export default function PurchaseOrdersPage() {
             </button>
           )}
 
+          {(row.status === "APPROVED" || row.status === "PARTIAL") && canManage && (
+            <button
+              title="Convert to Invoice"
+              onClick={(e) => { e.stopPropagation(); setConvertPO(row); }}
+              className="p-1.5 rounded-md transition-colors text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+            >
+              <Receipt className="w-3.5 h-3.5" />
+            </button>
+          )}
+
           {(row.status === "DRAFT" || row.status === "PENDING_APPROVAL") && canManage && (
             <button
               title="Cancel Order"
@@ -496,6 +508,12 @@ export default function PurchaseOrdersPage() {
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingPO(null); }}
         editingPO={editingPO}
+      />
+
+      <PurchaseInvoiceModal
+        isOpen={!!convertPO}
+        onClose={() => setConvertPO(null)}
+        defaultPOId={convertPO?.id ?? null}
       />
 
       <POViewModal

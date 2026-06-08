@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends, Query, UploadFile, File
+﻿from fastapi import APIRouter, HTTPException, status, Depends, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import csv, io, re
@@ -30,7 +30,7 @@ def _denormalize_agency_names(db, distributor_channels: list) -> list:
     return distributor_channels
 
 
-# ── Agencies list (for Distributor channel dropdowns) — BEFORE /{id} ─────────
+# â”€â”€ Agencies list (for Distributor channel dropdowns) â€” BEFORE /{id} â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/agencies")
 async def list_agencies(
@@ -44,12 +44,12 @@ async def list_agencies(
     return [{"id": str(d["_id"]), "short_name": d.get("short_name", "")} for d in docs]
 
 
-# ── List ──────────────────────────────────────────────────────────────────────
+# â”€â”€ List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("", response_model=PaginatedResponse[SupplierResponse])
 async def list_suppliers(
     page:          int              = Query(default=1, ge=1),
-    page_size:     int              = Query(default=20, ge=1, le=100),
+    page_size:     int              = Query(default=20, ge=1, le=500),
     search:        str | None       = Query(default=None),
     is_active:     bool | None      = Query(default=None),
     supplier_type: SupplierType | None = Query(default=None),
@@ -86,7 +86,7 @@ async def list_suppliers(
     )
 
 
-# ── Export CSV — must appear BEFORE /{supplier_id} ───────────────────────────
+# â”€â”€ Export CSV â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/export")
 async def export_suppliers(
@@ -131,7 +131,7 @@ async def export_suppliers(
     )
 
 
-# ── Import template — must appear BEFORE /{supplier_id} ──────────────────────
+# â”€â”€ Import template â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/import/template")
 async def get_import_template(current_user: dict = Depends(get_current_user)):
@@ -146,12 +146,12 @@ async def get_import_template(current_user: dict = Depends(get_current_user)):
     )
 
 
-# ── Import CSV — must appear BEFORE /{supplier_id} ───────────────────────────
+# â”€â”€ Import CSV â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("/import")
 async def import_suppliers(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db      = get_db()
     content = await file.read()
@@ -226,12 +226,12 @@ async def import_suppliers(
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
 
 
-# ── Create ────────────────────────────────────────────────────────────────────
+# â”€â”€ Create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
 async def create_supplier(
     payload:      SupplierCreate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
@@ -257,7 +257,7 @@ async def create_supplier(
     return SupplierResponse(**doc_to_dict(doc))
 
 
-# ── Get one ───────────────────────────────────────────────────────────────────
+# â”€â”€ Get one â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/{supplier_id}", response_model=SupplierResponse)
 async def get_supplier(
@@ -271,13 +271,13 @@ async def get_supplier(
     return SupplierResponse(**doc_to_dict(doc))
 
 
-# ── Update ────────────────────────────────────────────────────────────────────
+# â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.patch("/{supplier_id}", response_model=SupplierResponse)
 async def update_supplier(
     supplier_id:  str,
     payload:      SupplierUpdate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db  = get_db()
     doc = db[Collections.SUPPLIERS].find_one({"_id": supplier_id})
@@ -300,3 +300,4 @@ async def update_supplier(
     )
     updated = db[Collections.SUPPLIERS].find_one({"_id": supplier_id})
     return SupplierResponse(**doc_to_dict(updated))
+

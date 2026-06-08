@@ -63,7 +63,14 @@
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(findstr /S /R \"INVENTORY.*push\\\\|batches\\\\|update_one\" \"F:\\\\Project\\\\PharmaOps\\\\backend\\\\src\\\\app\\\\api\\\\v1\\\\purchase_orders.py\")",
       "PowerShell(head *)",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "PowerShell(Set-Content *)",
+      "PowerShell(Get-ChildItem -Recurse \"F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\app\\\\\\(pages\\)\" -Filter \"page.tsx\" | Select-String -Pattern \"canManage|isManager|isAdmin\" | Where-Object { $_.Path -match \"supplier\" } | Select-Object Line, Path)",
+      "PowerShell(python --version)",
+      "PowerShell(py -3.11 --version 2>$null)",
+      "PowerShell(py -3.12 --version 2>$null)",
+      "PowerShell(py -3.13 --version 2>$null)",
+      "PowerShell(Get-ChildItem -Path \"F:\\\\Project\\\\PharmaOps\" -Recurse -Name | Where-Object {$_ -match \"\\\\.\\(bat|ps1\\)$\"})"
     ]
   }
 }

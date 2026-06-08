@@ -19,6 +19,7 @@ interface AutocompleteProps {
   error?:       string;
   required?:    boolean;
   isLoading?:   boolean;
+  disabled?:    boolean;
   className?:   string;
 }
 
@@ -32,6 +33,7 @@ export function Autocomplete({
   error,
   required,
   isLoading,
+  disabled,
   className,
 }: AutocompleteProps) {
   const [inputValue, setInputValue] = useState("");
@@ -92,9 +94,9 @@ export function Autocomplete({
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => { if (!disabled) setIsOpen(true); }}
           placeholder={isLoading ? "Loading…" : placeholder}
-          disabled={isLoading}
+          disabled={isLoading || disabled}
           className={cn(
             "form-input pr-8",
             error && "border-danger-500 focus:ring-danger-500"

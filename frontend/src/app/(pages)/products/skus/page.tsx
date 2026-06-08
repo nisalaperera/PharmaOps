@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -25,7 +25,7 @@ import { SkuModal }               from "./components/SkuModal";
 import { SkuViewModal }           from "./components/SkuViewModal";
 import type { ProductSku, ImportResult } from "@/types";
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildSkuRow(sku: ProductSku): string[] {
   return [sku.name, sku.plural || "", sku.sku_type, sku.is_active ? "TRUE" : "FALSE"];
@@ -61,7 +61,7 @@ async function exportSkusPdf(skus: ProductSku[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal — continue without it.
+    // Logo load failure is non-fatal â€” continue without it.
   }
 
   doc.setFontSize(13);
@@ -71,18 +71,18 @@ async function exportSkusPdf(skus: ProductSku[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`SKUs Report — ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`SKUs Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
   doc.save(`skus_${exportDateStamp()}.pdf`);
 }
 
-// ─── SKUs page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ SKUs page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function SkusPage() {
   const { permissions } = useAuth();
-  const canManage       = permissions?.isAdmin || permissions?.isManager;
+  const canManage       = permissions?.can("BRANCH_MANAGER");
   const queryClient     = useQueryClient();
 
   const [typeFilter,       setTypeFilter]       = useState("");
@@ -104,7 +104,7 @@ export default function SkusPage() {
     queryFn:  () => apiGet<ProductSku[]>("/products/skus"),
   });
 
-  // ─── Client-side filter, search, and sort ────────────────────────────────────
+  // â”€â”€â”€ Client-side filter, search, and sort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const filteredSkus = useMemo(() => {
     const q        = search.toLowerCase();
@@ -145,7 +145,7 @@ export default function SkusPage() {
     setFilterVisible(false);
   }
 
-  // ─── Selection ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
@@ -162,7 +162,7 @@ export default function SkusPage() {
   const selectedItems  = filteredSkus.filter((s) => selectedKeys.has(s.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // ─── Export ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function handleExportCsv() {
     exportSkusCsv(allPagesSelected ? filteredSkus : selectedItems);
@@ -172,7 +172,7 @@ export default function SkusPage() {
     await exportSkusPdf(selectedItems);
   }
 
-  // ─── Toggle status mutation ──────────────────────────────────────────────────
+  // â”€â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleStatusMutation = useMutation({
     mutationFn: (sku: ProductSku) =>
@@ -193,7 +193,7 @@ export default function SkusPage() {
     },
   });
 
-  // ─── Import ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleImport(file: File): Promise<ImportResult> {
     const result = await apiUploadFile<ImportResult>("/products/skus/import", file);
@@ -206,7 +206,7 @@ export default function SkusPage() {
     downloadBlob(blob, "skus_import_template.csv");
   }
 
-  // ─── Columns ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const columns: Column<ProductSku>[] = [
     {
@@ -224,7 +224,7 @@ export default function SkusPage() {
       header: "Plural",
       render: (row) => (
         <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.plural || "—"}
+          {row.plural || "â€”"}
         </span>
       ),
     },
@@ -321,7 +321,7 @@ export default function SkusPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search by name or plural…"
+            placeholder="Search by name or pluralâ€¦"
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -530,3 +530,5 @@ export default function SkusPage() {
     </div>
   );
 }
+
+

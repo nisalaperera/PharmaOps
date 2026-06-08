@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -23,7 +23,7 @@ import { GenericModal }           from "./components/GenericModal";
 import { GenericViewModal }       from "./components/GenericViewModal";
 import type { ProductGeneric, ImportResult } from "@/types";
 
-// ─── Export helpers ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildGenericRow(generic: ProductGeneric): string[] {
   return [generic.name, generic.description ?? ""];
@@ -59,7 +59,7 @@ async function exportGenericsPdf(generics: ProductGeneric[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal — continue without it.
+    // Logo load failure is non-fatal â€” continue without it.
   }
 
   doc.setFontSize(13);
@@ -69,18 +69,18 @@ async function exportGenericsPdf(generics: ProductGeneric[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Generics Report — ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Generics Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
   doc.save(`generics_${exportDateStamp()}.pdf`);
 }
 
-// ─── Generics page ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Generics page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function GenericsPage() {
   const { permissions } = useAuth();
-  const canManage       = permissions?.isAdmin || permissions?.isManager;
+  const canManage       = permissions?.can("BRANCH_MANAGER");
   const queryClient     = useQueryClient();
 
   const [statusFilter,     setStatusFilter]     = useState("");
@@ -131,7 +131,7 @@ export default function GenericsPage() {
   const totalPages    = Math.max(1, Math.ceil(totalItems / pagination.pageSize));
   const pagedGenerics = filteredGenerics.slice((pagination.page - 1) * pagination.pageSize, pagination.page * pagination.pageSize);
 
-  // ─── Selection ───────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
@@ -148,7 +148,7 @@ export default function GenericsPage() {
   const selectedItems  = filteredGenerics.filter((g) => selectedKeys.has(g.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // ─── Export ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function handleExportCsv() {
     exportGenericsCsv(allPagesSelected ? filteredGenerics : selectedItems);
@@ -158,7 +158,7 @@ export default function GenericsPage() {
     await exportGenericsPdf(selectedItems);
   }
 
-  // ─── Toggle status mutation ──────────────────────────────────────────────────
+  // â”€â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const toggleStatusMutation = useMutation({
     mutationFn: (generic: ProductGeneric) =>
@@ -179,7 +179,7 @@ export default function GenericsPage() {
     },
   });
 
-  // ─── Import ──────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   async function handleImport(file: File): Promise<ImportResult> {
     const result = await apiUploadFile<ImportResult>("/products/generics/import", file);
@@ -192,7 +192,7 @@ export default function GenericsPage() {
     downloadBlob(blob, "generics_import_template.csv");
   }
 
-  // ─── Columns ─────────────────────────────────────────────────────────────────
+  // â”€â”€â”€ Columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const columns: Column<ProductGeneric>[] = [
     {
@@ -211,7 +211,7 @@ export default function GenericsPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm truncate max-w-[400px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "—"}
+          {row.description || "â€”"}
         </p>
       ),
     },
@@ -296,7 +296,7 @@ export default function GenericsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search generics…"
+            placeholder="Search genericsâ€¦"
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -493,3 +493,5 @@ export default function GenericsPage() {
     </div>
   );
 }
+
+

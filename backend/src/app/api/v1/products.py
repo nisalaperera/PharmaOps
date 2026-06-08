@@ -1,4 +1,4 @@
-import csv
+﻿import csv
 import io
 import re
 from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/products", tags=["Products"])
 PRODUCT_SORT_FIELDS = {"name", "brand_name", "category_name", "generic_name", "created_at", "last_modified_at"}
 
 
-# ─── Internal helpers ─────────────────────────────────────────────────────────
+# â”€â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _simple_list(collection: str, response_model):
     db   = get_db()
@@ -72,7 +72,7 @@ def _parse_bool(value: str, default: bool = False) -> bool:
     return value.strip().upper() not in ("FALSE", "0", "NO", "INACTIVE") if value.strip() else default
 
 
-# ─── Sub-catalog: Generics ────────────────────────────────────────────────────
+# â”€â”€â”€ Sub-catalog: Generics â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/generics", response_model=list[ProductGenericResponse])
 async def list_generics(
@@ -85,7 +85,7 @@ async def list_generics(
     return [ProductGenericResponse(**doc_to_dict(d)) for d in docs]
 
 @router.post("/generics", response_model=ProductGenericResponse, status_code=201)
-async def create_generic(payload: ProductGenericCreate, current_user: dict = Depends(require_min_role("MANAGER"))):
+async def create_generic(payload: ProductGenericCreate, current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     db = get_db()
     if db[Collections.GENERICS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A generic named '{payload.name}' already exists.")
@@ -103,7 +103,7 @@ async def export_generics(current_user: dict = Depends(get_current_user)):
     return _csv_response(output, "generics_export.csv")
 
 @router.get("/generics/import/template")
-async def generics_import_template(current_user: dict = Depends(require_min_role("MANAGER"))):
+async def generics_import_template(current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["name", "description"])
@@ -115,7 +115,7 @@ async def generics_import_template(current_user: dict = Depends(require_min_role
 @router.post("/generics/import")
 async def import_generics(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db     = get_db()
     reader = _decode_csv_upload(await file.read())
@@ -150,7 +150,7 @@ async def import_generics(
 @router.patch("/generics/{generic_id}", response_model=ProductGenericResponse)
 async def update_generic(
     generic_id: str, payload: ProductGenericUpdate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db = get_db()
     if not db[Collections.GENERICS].find_one({"_id": generic_id}):
@@ -167,7 +167,7 @@ async def update_generic(
     return ProductGenericResponse(**doc_to_dict(db[Collections.GENERICS].find_one({"_id": generic_id})))
 
 
-# ─── Sub-catalog: Brands ──────────────────────────────────────────────────────
+# â”€â”€â”€ Sub-catalog: Brands â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("/brands", response_model=list[ProductBrandResponse])
 async def list_brands(
@@ -180,7 +180,7 @@ async def list_brands(
     return [ProductBrandResponse(**doc_to_dict(d)) for d in docs]
 
 @router.post("/brands", response_model=ProductBrandResponse, status_code=201)
-async def create_brand(payload: ProductBrandCreate, current_user: dict = Depends(require_min_role("MANAGER"))):
+async def create_brand(payload: ProductBrandCreate, current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     db = get_db()
     if db[Collections.BRANDS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A brand named '{payload.name}' already exists.")
@@ -198,7 +198,7 @@ async def export_brands(current_user: dict = Depends(get_current_user)):
     return _csv_response(output, "brands_export.csv")
 
 @router.get("/brands/import/template")
-async def brands_import_template(current_user: dict = Depends(require_min_role("MANAGER"))):
+async def brands_import_template(current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["name", "manufacturer_name", "description"])
@@ -210,7 +210,7 @@ async def brands_import_template(current_user: dict = Depends(require_min_role("
 @router.post("/brands/import")
 async def import_brands(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db     = get_db()
     reader = _decode_csv_upload(await file.read())
@@ -247,7 +247,7 @@ async def import_brands(
 @router.patch("/brands/{brand_id}", response_model=ProductBrandResponse)
 async def update_brand(
     brand_id: str, payload: ProductBrandUpdate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db = get_db()
     if not db[Collections.BRANDS].find_one({"_id": brand_id}):
@@ -264,7 +264,7 @@ async def update_brand(
     return ProductBrandResponse(**doc_to_dict(db[Collections.BRANDS].find_one({"_id": brand_id})))
 
 
-# ─── Sub-catalog: Categories ──────────────────────────────────────────────────
+# â”€â”€â”€ Sub-catalog: Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _resolve_categories(db, filt: dict | None = None) -> list[ProductCategoryResponse]:
     docs       = list(db[Collections.CATEGORIES].find(filt or {}).sort("name", ASCENDING))
@@ -303,7 +303,7 @@ async def list_categories(
 @router.post("/categories", response_model=ProductCategoryResponse, status_code=201)
 async def create_category(
     payload:      ProductCategoryCreate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db = get_db()
     if payload.parent_id and not db[Collections.CATEGORIES].find_one({"_id": payload.parent_id}):
@@ -341,7 +341,7 @@ async def export_categories(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/categories/import/template")
-async def categories_import_template(current_user: dict = Depends(require_min_role("MANAGER"))):
+async def categories_import_template(current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["name", "description", "parent_name", "is_active"])
@@ -355,7 +355,7 @@ async def categories_import_template(current_user: dict = Depends(require_min_ro
 @router.post("/categories/import")
 async def import_categories(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db     = get_db()
     reader = _decode_csv_upload(await file.read())
@@ -401,7 +401,7 @@ async def import_categories(
 async def update_category(
     category_id:  str,
     payload:      ProductCategoryUpdate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db = get_db()
     if not db[Collections.CATEGORIES].find_one({"_id": category_id}):
@@ -438,7 +438,7 @@ async def update_category(
     return ProductCategoryResponse(**doc)
 
 
-# ─── Sub-catalog: SKUs ────────────────────────────────────────────────────────
+# â”€â”€â”€ Sub-catalog: SKUs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 VALID_SKU_TYPES = {"COUNT", "VOLUME", "WEIGHT", "LENGTH"}
 
@@ -455,7 +455,7 @@ async def list_skus(
     return [ProductSkuResponse(**doc_to_dict(d)) for d in docs]
 
 @router.post("/skus", response_model=ProductSkuResponse, status_code=201)
-async def create_sku(payload: ProductSkuCreate, current_user: dict = Depends(require_min_role("MANAGER"))):
+async def create_sku(payload: ProductSkuCreate, current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     db = get_db()
     if db[Collections.SKUS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A SKU named '{payload.name}' already exists.")
@@ -484,7 +484,7 @@ async def export_skus(
     return _csv_response(output, "skus_export.csv")
 
 @router.get("/skus/import/template")
-async def skus_import_template(current_user: dict = Depends(require_min_role("MANAGER"))):
+async def skus_import_template(current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["name", "plural", "sku_type", "is_active"])
@@ -499,7 +499,7 @@ async def skus_import_template(current_user: dict = Depends(require_min_role("MA
 @router.post("/skus/import")
 async def import_skus(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db     = get_db()
     reader = _decode_csv_upload(await file.read())
@@ -545,7 +545,7 @@ async def import_skus(
 @router.patch("/skus/{sku_id}", response_model=ProductSkuResponse)
 async def update_sku(
     sku_id: str, payload: ProductSkuUpdate,
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db = get_db()
     if not db[Collections.SKUS].find_one({"_id": sku_id}):
@@ -561,7 +561,7 @@ async def update_sku(
     return ProductSkuResponse(**doc_to_dict(db[Collections.SKUS].find_one({"_id": sku_id})))
 
 
-# ─── SKU mapping helpers ──────────────────────────────────────────────────────
+# â”€â”€â”€ SKU mapping helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _compute_basic_counts(mappings: list[dict]) -> list[int]:
     """Resolve basic_sku_count for each mapping entry by following the chain."""
@@ -599,12 +599,12 @@ def _parse_sku_mappings(row: dict, mapping_indices: list[int]) -> list[dict]:
     return [{**m, "basic_sku_count": counts[i]} for i, m in enumerate(raw)]
 
 
-# ─── Products ─────────────────────────────────────────────────────────────────
+# â”€â”€â”€ Products â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.get("", response_model=PaginatedResponse[ProductResponse])
 async def list_products(
     page:         int  = Query(default=1, ge=1),
-    page_size:    int  = Query(default=20, ge=1, le=100),
+    page_size:    int  = Query(default=20, ge=1, le=500),
     search:       str | None  = Query(default=None),
     category_id:  str | None  = Query(default=None),
     brand_id:     str | None  = Query(default=None),
@@ -633,7 +633,7 @@ async def list_products(
 
 
 @router.post("", response_model=ProductResponse, status_code=201)
-async def create_product(payload: ProductCreate, current_user: dict = Depends(require_min_role("MANAGER"))):
+async def create_product(payload: ProductCreate, current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     db     = get_db()
     if db[Collections.PRODUCTS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A product named '{payload.name}' already exists.")
@@ -714,7 +714,7 @@ async def export_products(
 
 
 @router.get("/import/template")
-async def products_import_template(current_user: dict = Depends(require_min_role("MANAGER"))):
+async def products_import_template(current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
@@ -741,7 +741,7 @@ async def products_import_template(current_user: dict = Depends(require_min_role
 @router.post("/import")
 async def import_products(
     file:         UploadFile = File(...),
-    current_user: dict = Depends(require_min_role("MANAGER")),
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db     = get_db()
     reader = _decode_csv_upload(await file.read())
@@ -844,7 +844,7 @@ async def get_product(product_id: str, current_user: dict = Depends(get_current_
 
 
 @router.patch("/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: str, payload: ProductUpdate, current_user: dict = Depends(require_min_role("MANAGER"))):
+async def update_product(product_id: str, payload: ProductUpdate, current_user: dict = Depends(require_min_role("BRANCH_MANAGER"))):
     db = get_db()
     if not db[Collections.PRODUCTS].find_one({"_id": product_id}):
         raise HTTPException(status_code=404, detail="Product not found")
@@ -867,7 +867,7 @@ async def update_product(product_id: str, payload: ProductUpdate, current_user: 
     return ProductResponse(**doc_to_dict(db[Collections.PRODUCTS].find_one({"_id": product_id})))
 
 
-# ─── Private helpers ──────────────────────────────────────────────────────────
+# â”€â”€â”€ Private helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _build_product_filter(
     search:       str | None,
@@ -886,3 +886,5 @@ def _build_product_filter(
     if search:
         filt.update(build_search_filter(search, ["name", "barcode", "generic_name", "brand_name", "category_name"]))
     return filt
+
+

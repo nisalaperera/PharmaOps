@@ -244,7 +244,7 @@ export function PrescriptionModal({ isOpen, onClose }: PrescriptionModalProps) {
                         <option value="">Select product…</option>
                         {products.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name}{p.sku ? ` (${p.sku})` : ""}
+                            {p.name}{p.barcode ? ` (${p.barcode})` : ""}
                           </option>
                         ))}
                       </select>
