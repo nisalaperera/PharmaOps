@@ -99,3 +99,5 @@ class Collections:
     POS_TRANSACTIONS             = "pos_transactions"
     POS_SETTLEMENTS              = "pos_settlements"
     SALES_ORDERS                 = "sales_orders"
+    PURCHASE_INVOICES            = "purchase_invoices"
+    PURCHASE_PAYMENTS            = "purchase_payments"

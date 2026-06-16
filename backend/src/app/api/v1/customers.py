@@ -177,6 +177,54 @@ async def get_customer(
     return CustomerResponse(**doc_to_dict(doc))
 
 
+# ── Credit ledger ─────────────────────────────────────────────────────────────
+
+@router.get("/{customer_id}/ledger")
+async def get_customer_ledger(
+    customer_id:  str,
+    current_user: dict = Depends(get_current_user),
+):
+    """Merged history of the customer's credit sales and payments, newest first."""
+    db  = get_db()
+    doc = db[Collections.CUSTOMERS].find_one({"_id": customer_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    customer = doc_to_dict(doc)
+
+    entries = []
+    for sale_doc in db[Collections.SALES].find({"customer_id": customer_id, "payment_method": "CREDIT"}):
+        sale          = doc_to_dict(sale_doc)
+        credit_amount = sale.get("credit_amount", sale.get("total_amount", 0))
+        entries.append({
+            "entry_type":     "CREDIT_SALE",
+            "id":             sale["id"],
+            "amount":         credit_amount,
+            "settled_amount": sale.get("credit_settled_amount", 0),
+            "settled":        sale.get("credit_settled", False),
+            "status":         sale.get("status", ""),
+            "created_at":     sale.get("created_at", ""),
+        })
+
+    for payment_doc in db[Collections.BILLING_PAYMENTS].find({"customer_id": customer_id}):
+        payment = doc_to_dict(payment_doc)
+        entries.append({
+            "entry_type":     "PAYMENT",
+            "id":             payment["id"],
+            "amount":         payment.get("amount", 0),
+            "payment_method": payment.get("payment_method", ""),
+            "sale_id":        payment.get("sale_id"),
+            "created_at":     payment.get("created_at", ""),
+        })
+
+    entries.sort(key=lambda e: e["created_at"], reverse=True)
+
+    return {
+        "outstanding_balance": customer.get("outstanding_balance", 0),
+        "credit_limit":        customer.get("credit_limit", 0),
+        "entries":             entries,
+    }
+
+
 # ── Update ────────────────────────────────────────────────────────────────────
 
 @router.patch("/{customer_id}", response_model=CustomerResponse)

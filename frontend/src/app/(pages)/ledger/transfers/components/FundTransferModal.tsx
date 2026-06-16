@@ -109,7 +109,7 @@ export function FundTransferModal({ isOpen, onClose }: FundTransferModalProps) {
     if (sourceType === "CASH_REGISTRY") {
       return registries.map((r) => ({ value: r.id, label: r.name }));
     }
-    return bankAccounts.map((a) => ({ value: a.id, label: `${a.account_name} â€” ${a.bank_name}` }));
+    return bankAccounts.map((a) => ({ value: a.id, label: `${a.account_name} & ${a.bank_name}` }));
   }
 
   const fromSourceOptions = getSourceOptions(watchedFromType);

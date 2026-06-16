@@ -138,7 +138,7 @@ export function BankAccountModal({ isOpen, onClose, editingAccount }: BankAccoun
         {/* Account Name */}
         <Input
           label="Account Name"
-          placeholder="e.g. Medi Guide Pharmacy â€” Colombo"
+          placeholder="e.g. Medi Guide Pharmacy & Colombo"
           required
           {...form.register("account_name")}
           error={form.formState.errors.account_name?.message}

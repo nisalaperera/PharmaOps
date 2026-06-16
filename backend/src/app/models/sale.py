@@ -56,3 +56,8 @@ class SaleResponse(SaleCreate, TimestampMixin):
     status:          SaleStatus = "COMPLETED"
     cashier_id:      str
     cashier_name:    str = ""
+    # Receivable tracking for CREDIT sales (defaults keep legacy docs parseable;
+    # legacy CREDIT docs lack these fields, so the UI falls back to total_amount)
+    credit_amount:         float = 0
+    credit_settled_amount: float = 0
+    credit_settled:        bool = False

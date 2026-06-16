@@ -150,13 +150,32 @@ export const TRANSFER_STATUS_LABEL: Record<TransferStatus, string> = {
 
 // ─── GRN / Purchase Invoice Status ────────────────────────────────────────────
 
-import type { GRNStatus, PurchaseInvoicePaymentStatus, SalesOrderStatus } from "@/types";
+import type { GRNStatus, PurchaseInvoiceStatus, PurchaseInvoicePaymentStatus, PurchasePaymentMethod, SalesOrderStatus } from "@/types";
 
 export const GRN_STATUS_FILTER_OPTIONS: { value: GRNStatus | ""; label: string }[] = [
   { value: "",          label: "All Statuses" },
   { value: "PENDING",   label: "Pending"      },
   { value: "PARTIAL",   label: "Partial"      },
   { value: "COMPLETED", label: "Completed"    },
+];
+
+export const PURCHASE_INVOICE_STATUS_FILTER_OPTIONS: { value: PurchaseInvoiceStatus | ""; label: string }[] = [
+  { value: "",         label: "All Statuses" },
+  { value: "DRAFT",    label: "Draft"        },
+  { value: "RECEIVED", label: "Received"     },
+  { value: "VERIFIED", label: "Verified"     },
+];
+
+export const PURCHASE_INVOICE_STATUS_OPTIONS: { value: PurchaseInvoiceStatus; label: string }[] = [
+  { value: "DRAFT",    label: "Draft"    },
+  { value: "RECEIVED", label: "Received" },
+  { value: "VERIFIED", label: "Verified" },
+];
+
+export const PURCHASE_PAYMENT_METHOD_OPTIONS: { value: PurchasePaymentMethod; label: string }[] = [
+  { value: "CASH",          label: "Cash"          },
+  { value: "CHEQUE",        label: "Cheque"        },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
 ];
 
 export const PURCHASE_INVOICE_PAYMENT_STATUS_FILTER_OPTIONS: { value: PurchaseInvoicePaymentStatus | ""; label: string }[] = [
@@ -435,3 +454,55 @@ export const CHEQUE_ISSUE_STATUS_LABEL: Record<ChequeIssueStatus, string> = {
   BOUNCED:   "Bounced",
   CANCELLED: "Cancelled",
 };
+
+// ─── Notifications ─────────────────────────────────────────────────────────────
+
+import type { NotificationType } from "@/types";
+
+export const NOTIFICATION_TYPE_LABEL: Record<NotificationType, string> = {
+  LOW_STOCK:        "Low Stock",
+  EXPIRY_ALERT:     "Expiry Alert",
+  PO_APPROVAL:      "PO Approval",
+  TRANSFER_REQUEST: "Transfer Request",
+  PAYMENT_DUE:      "Payment Due",
+  SYSTEM:           "System",
+};
+
+export const NOTIFICATION_TYPE_FILTER_OPTIONS: { value: NotificationType | ""; label: string }[] = [
+  { value: "",                 label: "All Types"        },
+  { value: "LOW_STOCK",        label: "Low Stock"        },
+  { value: "EXPIRY_ALERT",     label: "Expiry Alert"     },
+  { value: "PO_APPROVAL",      label: "PO Approval"      },
+  { value: "TRANSFER_REQUEST", label: "Transfer Request" },
+  { value: "PAYMENT_DUE",      label: "Payment Due"      },
+  { value: "SYSTEM",           label: "System"           },
+];
+
+export const NOTIFICATION_READ_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "",      label: "All"    },
+  { value: "false", label: "Unread" },
+  { value: "true",  label: "Read"   },
+];
+
+// ─── Audit Log ─────────────────────────────────────────────────────────────────
+
+export const AUDIT_ACTION_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "",       label: "All Actions" },
+  { value: "CREATE", label: "Create"      },
+  { value: "UPDATE", label: "Update"      },
+  { value: "DELETE", label: "Delete"      },
+  { value: "SETTLE", label: "Settle"      },
+];
+
+export const AUDIT_RESOURCE_FILTER_OPTIONS: { value: string; label: string }[] = [
+  { value: "",               label: "All Modules"    },
+  { value: "sale",           label: "Sales"          },
+  { value: "customer",       label: "Customers"      },
+  { value: "payroll",        label: "Payroll"        },
+  { value: "cash_registry",  label: "Cash Registry"  },
+  { value: "bank_account",   label: "Bank Account"   },
+  { value: "fund_transfer",  label: "Fund Transfer"  },
+  { value: "pos_machine",    label: "POS Machine"    },
+  { value: "pos_transaction",label: "POS Transaction"},
+  { value: "credit_payment", label: "Credit Payment" },
+];

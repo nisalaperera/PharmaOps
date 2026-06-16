@@ -6,7 +6,11 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import require_min_role, get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields
-from app.models.payroll import PayrollCreate, PayrollResponse
+from app.utils.treasury_posting import (
+    _get_source_doc, _source_display_name,
+    _create_cash_transaction, _create_bank_transaction,
+)
+from app.models.payroll import PayrollCreate, PayrollPayRequest, PayrollResponse
 from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/staff/payroll", tags=["Staff"])
@@ -175,6 +179,7 @@ async def generate_payroll(
 @router.post("/{payroll_id}/pay", response_model=PayrollResponse)
 async def mark_as_paid(
     payroll_id:   str,
+    payload:      PayrollPayRequest,
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
     db = get_db()
@@ -184,19 +189,69 @@ async def mark_as_paid(
     if doc.get("is_paid"):
         raise HTTPException(status_code=400, detail="Payroll record is already marked as paid")
 
+    payroll    = doc_to_dict(doc)
+    net_salary = payroll.get("net_salary", 0)
+
+    source_doc = _get_source_doc(db, payload.source_type, payload.source_id)
+    if not source_doc:
+        raise HTTPException(status_code=404, detail="Payment source not found")
+    if not source_doc.get("is_active", False):
+        raise HTTPException(status_code=400, detail="Payment source is inactive")
+    if payload.source_type == "CASH_REGISTRY" and not source_doc.get("is_open", False):
+        raise HTTPException(status_code=400, detail="Cash registry is closed. Open it before paying from it.")
+
+    balance_before = source_doc.get("current_balance", 0)
+    if balance_before < net_salary:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Insufficient balance. Available: {balance_before:.2f}, required: {net_salary:.2f}",
+        )
+    balance_after = balance_before - net_salary
+
+    month_num = payroll.get("month", 1)
+    month_str = MONTH_ABBR[month_num - 1] if 1 <= month_num <= 12 else str(month_num)
+    txn_notes = f"Payroll - {payroll.get('staff_name', '')} {month_str} {payroll.get('year', '')}"
+    if payload.notes:
+        txn_notes += f" ({payload.notes})"
+
+    if payload.source_type == "CASH_REGISTRY":
+        db[Collections.CASH_REGISTRIES].update_one(
+            {"_id": payload.source_id},
+            {"$set": {"current_balance": balance_after, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        _create_cash_transaction(
+            db, registry_doc=source_doc, transaction_type="WITHDRAWAL",
+            amount=net_salary, balance_before=balance_before, balance_after=balance_after,
+            notes=txn_notes, reference_id=payroll_id, current_user=current_user,
+        )
+    else:
+        db[Collections.BANK_ACCOUNTS].update_one(
+            {"_id": payload.source_id},
+            {"$set": {"current_balance": balance_after, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        _create_bank_transaction(
+            db, account_doc=source_doc, transaction_type="WITHDRAWAL",
+            amount=net_salary, balance_before=balance_before, balance_after=balance_after,
+            notes=txn_notes, reference_id=payroll_id, current_user=current_user,
+        )
+
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.PAYROLL].update_one(
         {"_id": payroll_id},
         {"$set": {
-            "is_paid":    True,
-            "paid_at":    now,
-            "paid_by":    current_user["id"],
-            "updated_at": now,
+            "is_paid":          True,
+            "paid_at":          now,
+            "paid_by":          current_user["id"],
+            "paid_source_type": payload.source_type,
+            "paid_source_id":   payload.source_id,
+            "paid_source_name": _source_display_name(payload.source_type, source_doc),
+            "updated_at":       now,
         }},
     )
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
         user_role=current_user["role"], action="UPDATE",
         resource="payroll", resource_id=payroll_id,
+        details={"paid_from": payload.source_type, "source_id": payload.source_id, "amount": net_salary},
     )
     return PayrollResponse(**doc_to_dict(db[Collections.PAYROLL].find_one({"_id": payroll_id})))

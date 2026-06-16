@@ -41,7 +41,7 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
   useEffect(() => {
     if (sale) {
       reset({
-        patient_id:     sale.customer_id ?? "",
+        customer_id:    sale.customer_id ?? "",
         sale_id:        sale.id,
         branch_id:      branchId,
         payment_method: "CASH",
@@ -67,7 +67,17 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
   });
 
   if (!sale) return null;
-  const outstandingBalance = sale.total_amount - (sale.refund_amount ?? 0);
+  // Legacy CREDIT sales predate per-sale receivable tracking — fall back to total
+  const creditAmount  = sale.credit_amount || sale.total_amount;
+  const remainingDue  = creditAmount - (sale.credit_settled_amount ?? 0);
+
+  function onSubmit(data: CreditPaymentValues) {
+    if (data.amount > remainingDue) {
+      showToast("error", "Amount Too High", `Payment cannot exceed the remaining due of ${remainingDue.toFixed(2)}.`);
+      return;
+    }
+    mutation.mutate(data);
+  }
 
   return (
     <Modal
@@ -76,7 +86,7 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
       title="Record Credit Payment"
       size="sm"
     >
-      <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
         {/* Balance info */}
         <div className="rounded-xl px-4 py-3 space-y-1 text-sm" style={{ background: "var(--color-surface-2)" }}>
@@ -88,9 +98,13 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
             <span style={{ color: "var(--color-text-muted)" }}>Sale Total</span>
             <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{sale.total_amount.toFixed(2)}</span>
           </div>
+          <div className="flex justify-between">
+            <span style={{ color: "var(--color-text-muted)" }}>Settled So Far</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{(sale.credit_settled_amount ?? 0).toFixed(2)}</span>
+          </div>
           <div className="flex justify-between font-semibold">
-            <span style={{ color: "var(--color-text-muted)" }}>Outstanding</span>
-            <span className="tabular-nums text-warning-600">{outstandingBalance.toFixed(2)}</span>
+            <span style={{ color: "var(--color-text-muted)" }}>Remaining Due</span>
+            <span className="tabular-nums text-warning-600">{remainingDue.toFixed(2)}</span>
           </div>
         </div>
 
@@ -104,6 +118,7 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
                 label="Payment Amount"
                 type="number"
                 min="0.01"
+                max={remainingDue}
                 step="0.01"
                 required
                 leftIcon={<DollarSign className="w-4 h-4" />}

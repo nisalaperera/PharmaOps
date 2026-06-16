@@ -1,7 +1,7 @@
 import type {
   UserRole, UserStatus, PaymentMethod, AttendanceStatus,
   SkuType, PurchaseOrderStatus, GRNStatus,
-  PurchaseInvoicePaymentStatus, SalesOrderStatus, TransferStatus,
+  PurchaseInvoiceStatus, PurchaseInvoicePaymentStatus, SalesOrderStatus, TransferStatus,
   SupplierType, ChannelCategory, ContactType,
 } from "@/types";
 
@@ -139,6 +139,20 @@ export const PURCHASE_INVOICE_PAYMENT_STATUS_LABEL: Record<PurchaseInvoicePaymen
   PAID:           "Paid",
 };
 
+// ─── Purchase Invoice status ──────────────────────────────────────────────────
+
+export const PURCHASE_INVOICE_STATUS_VARIANT: Record<PurchaseInvoiceStatus, BadgeVariant> = {
+  DRAFT:    "default",
+  RECEIVED: "info",
+  VERIFIED: "success",
+};
+
+export const PURCHASE_INVOICE_STATUS_LABEL: Record<PurchaseInvoiceStatus, string> = {
+  DRAFT:    "Draft",
+  RECEIVED: "Received",
+  VERIFIED: "Verified",
+};
+
 // ─── Sales Order status ────────────────────────────────────────────────────────
 
 export const SALES_ORDER_STATUS_VARIANT: Record<SalesOrderStatus, BadgeVariant> = {
@@ -205,4 +219,26 @@ export const CHEQUE_ISSUE_STATUS_VARIANT: Record<ChequeIssueStatus, BadgeVariant
   CLEARED:   "success",
   BOUNCED:   "danger",
   CANCELLED: "default",
+};
+
+// ─── Notification type ─────────────────────────────────────────────────────────
+
+import type { NotificationType } from "@/types";
+
+export const NOTIFICATION_TYPE_VARIANT: Record<NotificationType, BadgeVariant> = {
+  LOW_STOCK:        "warning",
+  EXPIRY_ALERT:     "danger",
+  PO_APPROVAL:      "info",
+  TRANSFER_REQUEST: "info",
+  PAYMENT_DUE:      "warning",
+  SYSTEM:           "default",
+};
+
+// ─── Audit log action ──────────────────────────────────────────────────────────
+
+export const AUDIT_ACTION_VARIANT: Record<string, BadgeVariant> = {
+  CREATE: "success",
+  UPDATE: "info",
+  DELETE: "danger",
+  SETTLE: "warning",
 };

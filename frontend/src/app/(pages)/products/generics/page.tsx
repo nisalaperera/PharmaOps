@@ -211,7 +211,7 @@ export default function GenericsPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm truncate max-w-[400px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "â€”"}
+          {row.description || "-"}
         </p>
       ),
     },

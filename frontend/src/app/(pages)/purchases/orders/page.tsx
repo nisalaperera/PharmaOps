@@ -513,6 +513,7 @@ export default function PurchaseOrdersPage() {
       <PurchaseInvoiceModal
         isOpen={!!convertPO}
         onClose={() => setConvertPO(null)}
+        editing={null}
         defaultPOId={convertPO?.id ?? null}
       />
 

@@ -114,7 +114,7 @@ export default function FundTransfersPage() {
             {row.notes}
           </span>
         ) : (
-          <span style={{ color: "var(--color-text-muted)" }}>â€”</span>
+          <span style={{ color: "var(--color-text-muted)" }}>&</span>
         ),
     },
     {

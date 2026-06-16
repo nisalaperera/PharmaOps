@@ -25,6 +25,12 @@ class PayrollUpdate(BaseModel):
     paid_at:     Optional[str] = None
 
 
+class PayrollPayRequest(BaseModel):
+    source_type: Literal["CASH_REGISTRY", "BANK_ACCOUNT"]
+    source_id:   str
+    notes:       Optional[str] = None
+
+
 class PayrollResponse(PayrollCreate, TimestampMixin):
     id:               str
     staff_name:       str = ""
@@ -36,3 +42,6 @@ class PayrollResponse(PayrollCreate, TimestampMixin):
     is_paid:          bool = False
     paid_at:          Optional[str] = None
     paid_by:          Optional[str] = None
+    paid_source_type: Optional[str] = None
+    paid_source_id:   Optional[str] = None
+    paid_source_name: Optional[str] = None

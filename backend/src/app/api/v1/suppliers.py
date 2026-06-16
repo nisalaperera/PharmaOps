@@ -30,7 +30,7 @@ def _denormalize_agency_names(db, distributor_channels: list) -> list:
     return distributor_channels
 
 
-# â”€â”€ Agencies list (for Distributor channel dropdowns) â€” BEFORE /{id} â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Agencies list (for Distributor channel dropdowns) BEFORE /{id}
 
 @router.get("/agencies")
 async def list_agencies(
@@ -44,7 +44,7 @@ async def list_agencies(
     return [{"id": str(d["_id"]), "short_name": d.get("short_name", "")} for d in docs]
 
 
-# â”€â”€ List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# List
 
 @router.get("", response_model=PaginatedResponse[SupplierResponse])
 async def list_suppliers(
@@ -86,7 +86,7 @@ async def list_suppliers(
     )
 
 
-# â”€â”€ Export CSV â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# Export CSV must appear BEFORE /{supplier_id}
 
 @router.get("/export")
 async def export_suppliers(
@@ -131,7 +131,7 @@ async def export_suppliers(
     )
 
 
-# â”€â”€ Import template â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Import template must appear BEFORE /{supplier_id}
 
 @router.get("/import/template")
 async def get_import_template(current_user: dict = Depends(get_current_user)):
@@ -146,7 +146,7 @@ async def get_import_template(current_user: dict = Depends(get_current_user)):
     )
 
 
-# â”€â”€ Import CSV â€” must appear BEFORE /{supplier_id} â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# â”€â”€ Import CSV must appear BEFORE /{supplier_id}
 
 @router.post("/import")
 async def import_suppliers(

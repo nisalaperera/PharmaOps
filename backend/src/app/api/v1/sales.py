@@ -6,6 +6,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.notify import notify_branch_users
 from app.models.sale import SaleCreate, SaleUpdate, SaleResponse
 from app.models.common import PaginatedResponse
 
@@ -127,8 +128,12 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
 
+    if payload.payment_method == "CREDIT" and not payload.customer_id:
+        raise HTTPException(status_code=400, detail="Credit sales require a customer")
+
     # Resolve customer name
     customer_name = ""
+    customer      = None
     if payload.customer_id:
         customer = db[Collections.CUSTOMERS].find_one({"_id": payload.customer_id})
         if customer:
@@ -158,6 +163,19 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
     change_amount = max(0.0, payload.paid_amount - total_amount)
     doc_id        = new_id()
 
+    is_credit = payload.payment_method == "CREDIT"
+    if is_credit:
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        credit_limit        = customer.get("credit_limit", 0) or 0
+        outstanding_balance = customer.get("outstanding_balance", 0) or 0
+        available_credit    = credit_limit - outstanding_balance
+        if total_amount > available_credit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Credit limit exceeded. Available credit: {max(0.0, available_credit):.2f}",
+            )
+
     sale_data = {
         "_id":            doc_id,
         **payload.model_dump(exclude={"items"}),
@@ -167,6 +185,9 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
         "discount_total": discount_total,
         "total_amount":   total_amount,
         "change_amount":  change_amount,
+        "credit_amount":          total_amount if is_credit else 0,
+        "credit_settled_amount":  0,
+        "credit_settled":         not is_credit,
         "status":         "COMPLETED",
         "cashier_id":     current_user["id"],
         "cashier_name":   current_user.get("full_name", ""),
@@ -183,21 +204,36 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
             "branch_id":  payload.branch_id,
         })
         if inv_doc:
+            was_low_stock = inv_doc.get("is_low_stock", False)
             batches = inv_doc.get("batches", [])
             for batch in batches:
                 if batch["batch_number"] == item.batch_number:
                     batch["quantity"] = max(0, batch["quantity"] - item.quantity)
             total_qty = sum(b["quantity"] for b in batches)
             min_level = inv_doc.get("min_stock_level", 0)
+            is_low_stock = total_qty <= min_level
             db[Collections.INVENTORY].update_one(
                 {"_id": inv_doc["_id"]},
                 {"$set": {
                     "batches":        batches,
                     "total_quantity": total_qty,
-                    "is_low_stock":   total_qty <= min_level,
+                    "is_low_stock":   is_low_stock,
                     "updated_at":     now,
                 }}
             )
+            if is_low_stock and not was_low_stock:
+                product_name = next(
+                    (i["product_name"] for i in items_data if i["product_id"] == item.product_id),
+                    "",
+                )
+                notify_branch_users(
+                    db,
+                    branch_id=payload.branch_id,
+                    type="LOW_STOCK",
+                    title="Low stock alert",
+                    message=f"{product_name or 'A product'} is low on stock ({total_qty} remaining, minimum {min_level}).",
+                    action_url="/inventory",
+                )
 
     # Credit sales: add to customer outstanding balance
     if payload.payment_method == "CREDIT" and payload.customer_id:
@@ -264,6 +300,16 @@ async def update_sale(
             db[Collections.CUSTOMERS].update_one(
                 {"_id": customer_id},
                 {"$inc": {"outstanding_balance": -refund_amt}}
+            )
+            # Keep the per-sale receivable in sync: a refund settles that much credit
+            credit_amount  = sale.get("credit_amount", sale.get("total_amount", 0))
+            settled_amount = min(credit_amount, sale.get("credit_settled_amount", 0) + refund_amt)
+            db[Collections.SALES].update_one(
+                {"_id": sale_id},
+                {"$set": {
+                    "credit_settled_amount": settled_amount,
+                    "credit_settled":        settled_amount >= credit_amount,
+                }}
             )
 
     await log_audit(

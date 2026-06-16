@@ -5,9 +5,10 @@ from app.core.config import get_settings
 from app.core.database import get_db, Collections
 from app.api.v1 import (
     auth, users, branches, products, inventory,
-    suppliers, purchase_orders, sales, sales_orders, prescriptions,
+    suppliers, purchase_orders, purchase_invoices, sales, sales_orders, prescriptions,
     patients, customers, doctors, stock_transfer, staff, payroll,
     reports, notifications, audit_log, preferences, billing, treasury, cheques, pos_machines,
+    dashboard,
 )
 
 settings = get_settings()
@@ -27,6 +28,25 @@ async def lifespan(app: FastAPI):
         db[Collections.USERS].create_index([("email", 1), ("status", 1)], background=True)
     except Exception:
         pass  # Firestore manages indexes externally — skip if not permitted
+
+    # ── Audit log retention ────────────────────────────────────────────────────
+    # TTL index expires new entries via their expires_at datetime; the startup
+    # purge handles legacy entries (which lack expires_at) and backends where
+    # TTL indexes are unavailable (e.g. Firestore PyMongo-compat).
+    if settings.audit_log_retention_days > 0:
+        from datetime import datetime, timedelta, timezone
+        try:
+            db = get_db()
+            db[Collections.AUDIT_LOGS].create_index("expires_at", expireAfterSeconds=0, background=True)
+        except Exception:
+            pass
+        try:
+            cutoff_iso = (
+                datetime.now(timezone.utc) - timedelta(days=settings.audit_log_retention_days)
+            ).isoformat()
+            db[Collections.AUDIT_LOGS].delete_many({"timestamp": {"$lt": cutoff_iso}})
+        except Exception:
+            pass
     yield
     # ── Shutdown: connection pool closes itself ────────────────────────────────
 
@@ -61,6 +81,7 @@ app.include_router(products.router,         prefix=API_PREFIX)
 app.include_router(inventory.router,        prefix=API_PREFIX)
 app.include_router(suppliers.router,        prefix=API_PREFIX)
 app.include_router(purchase_orders.router,  prefix=API_PREFIX)
+app.include_router(purchase_invoices.router, prefix=API_PREFIX)
 app.include_router(sales.router,            prefix=API_PREFIX)
 app.include_router(sales_orders.router,     prefix=API_PREFIX)
 app.include_router(prescriptions.router,    prefix=API_PREFIX)
@@ -78,6 +99,7 @@ app.include_router(preferences.router,      prefix=API_PREFIX)
 app.include_router(treasury.router,         prefix=API_PREFIX)
 app.include_router(cheques.router,          prefix=API_PREFIX)
 app.include_router(pos_machines.router,     prefix=API_PREFIX)
+app.include_router(dashboard.router,        prefix=API_PREFIX)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

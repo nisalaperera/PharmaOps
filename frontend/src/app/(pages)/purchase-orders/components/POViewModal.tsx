@@ -139,13 +139,13 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                       {item.product_name}
                     </td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                      {item.quantity.toLocaleString()}
+                      {item.unit_quantity.toLocaleString()}
                     </td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
                       {item.unit_price.toFixed(2)}
                     </td>
                     <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>
-                      {item.total_price.toFixed(2)}
+                      {item.line_total.toFixed(2)}
                     </td>
                   </tr>
                 ))}

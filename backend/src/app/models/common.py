@@ -34,6 +34,18 @@ class PaginationParams(BaseModel):
     search:    Optional[str] = None
 
 
+class ImportRowError(BaseModel):
+    row:     int
+    message: str
+
+
+class ImportResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    failed:  int = 0
+    errors:  list[ImportRowError] = []
+
+
 def paginate(items: list, page: int, page_size: int) -> dict:
     total       = len(items)
     total_pages = max(1, -(-total // page_size))  # ceil division

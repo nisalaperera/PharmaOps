@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
   Wallet, Plus, Eye, SlidersHorizontal,
   CheckCircle2, FileDown, FileText,
@@ -15,10 +15,9 @@ import { SearchBar }              from "@/components/common/SearchBar";
 import { FilterBar }              from "@/components/common/FilterBar";
 import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
-import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { useAuth }                from "@/hooks/useAuth";
 import { usePagination }          from "@/hooks/usePagination";
-import { apiGet, apiPost, apiDownloadFile, downloadBlob } from "@/lib/api-client";
+import { apiGet, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
 import {
   MONTH_OPTIONS, MONTH_FILTER_OPTIONS,
@@ -28,6 +27,7 @@ import {
 import APP_CONFIG from "@/lib/config";
 import { PayrollModal }     from "@/app/(pages)/staff/payroll/components/PayrollModal";
 import { PayrollViewModal } from "@/app/(pages)/staff/payroll/components/PayrollViewModal";
+import { PayrollPayModal }  from "@/app/(pages)/staff/payroll/components/PayrollPayModal";
 import type { Payroll, Branch, PaginatedResponse } from "@/types";
 
 // â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -163,8 +163,6 @@ export default function PayrollPage() {
 
   // â”€â”€â”€ Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-  const queryClient = useQueryClient();
-
   const { data, isLoading, isFetching } = useQuery<PaginatedResponse<Payroll>>({
     queryKey:        ["payroll", queryParams, filters],
     queryFn:         () => apiGet<PaginatedResponse<Payroll>>("/staff/payroll", { ...queryParams, ...filters }),
@@ -187,22 +185,6 @@ export default function PayrollPage() {
   const currentBranchName = branchFilter ? (branchNameMap[branchFilter] ?? undefined) : undefined;
 
   // â”€â”€â”€ Mark as paid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-  const payMutation = useMutation({
-    mutationFn: (payroll: Payroll) => apiPost<Payroll>(`/payroll/${payroll.id}/pay`, {}),
-    onSuccess: (_, payroll) => {
-      queryClient.invalidateQueries({ queryKey: ["payroll"] });
-      showToast(
-        "success",
-        "Payroll Marked as Paid",
-        `${payroll.staff_name}'s ${periodLabel(payroll.month, payroll.year)} payroll has been marked as paid.`,
-      );
-      setConfirmPay(null);
-    },
-    onError: (err: { message?: string }) => {
-      showToast("error", "Payment Failed", err?.message ?? "Something went wrong. Please try again.");
-    },
-  });
 
   // â”€â”€â”€ Selection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -561,27 +543,9 @@ export default function PayrollPage() {
         branchNameMap={branchNameMap}
       />
 
-      <ConfirmModal
-        isOpen={!!confirmPay}
+      <PayrollPayModal
+        payroll={confirmPay}
         onClose={() => setConfirmPay(null)}
-        title="Mark Payroll as Paid"
-        body={
-          <>
-            Mark{" "}
-            <span className="font-semibold" style={{ color: "var(--color-text)" }}>
-              {confirmPay?.staff_name}
-            </span>
-            {"'s "}
-            <span className="font-semibold" style={{ color: "var(--color-text)" }}>
-              {confirmPay ? periodLabel(confirmPay.month, confirmPay.year) : ""}
-            </span>
-            {" payroll as paid? This action cannot be undone."}
-          </>
-        }
-        confirmLabel="Mark as Paid"
-        variant="primary"
-        onConfirm={() => confirmPay && payMutation.mutate(confirmPay)}
-        isLoading={payMutation.isPending}
       />
     </div>
   );

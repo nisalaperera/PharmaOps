@@ -9,6 +9,7 @@ from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
+BILLING_SORT_FIELDS = {"created_at", "amount", "customer_name"}
 BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
 
 
@@ -25,6 +26,8 @@ async def list_credit_payments(
     customer_id: str | None = Query(default=None),
     page:        int        = Query(default=1, ge=1),
     page_size:   int        = Query(default=20, ge=1, le=100),
+    sort_by:     str        = Query(default="created_at"),
+    sort_dir:    str        = Query(default="desc"),
     current_user: dict = Depends(get_current_user),
 ):
     db  = get_db()
@@ -33,9 +36,12 @@ async def list_credit_payments(
     if customer_id:
         flt["customer_id"] = customer_id
 
+    sort_field     = sort_by if sort_by in BILLING_SORT_FIELDS else "created_at"
+    sort_direction = 1 if sort_dir == "asc" else -1
+
     total = db[Collections.BILLING_PAYMENTS].count_documents(flt)
     skip  = (page - 1) * page_size
-    docs  = db[Collections.BILLING_PAYMENTS].find(flt).sort("created_at", -1).skip(skip).limit(page_size)
+    docs  = db[Collections.BILLING_PAYMENTS].find(flt).sort(sort_field, sort_direction).skip(skip).limit(page_size)
 
     return PaginatedResponse[CreditPaymentResponse](
         data=[CreditPaymentResponse(**doc_to_dict(d)) for d in docs],
@@ -61,6 +67,24 @@ async def record_credit_payment(
             detail=f"Payment amount exceeds outstanding balance of {outstanding:.2f}",
         )
 
+    # When allocated to a specific sale, validate and settle that receivable
+    sale = None
+    if payload.sale_id:
+        sale = db[Collections.SALES].find_one({"_id": payload.sale_id})
+        if not sale:
+            raise HTTPException(status_code=404, detail="Sale not found")
+        if sale.get("customer_id") != payload.customer_id:
+            raise HTTPException(status_code=400, detail="Sale does not belong to this customer")
+        if sale.get("payment_method") != "CREDIT":
+            raise HTTPException(status_code=400, detail="Payments can only be allocated to credit sales")
+        credit_amount = sale.get("credit_amount", sale.get("total_amount", 0))
+        remaining_due = credit_amount - sale.get("credit_settled_amount", 0)
+        if payload.amount > remaining_due + 0.001:  # small float tolerance
+            raise HTTPException(
+                status_code=400,
+                detail=f"Payment amount exceeds the sale's remaining due of {remaining_due:.2f}",
+            )
+
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
 
@@ -80,6 +104,17 @@ async def record_credit_payment(
         {"_id": payload.customer_id},
         {"$inc": {"outstanding_balance": -payload.amount}}
     )
+
+    if sale:
+        credit_amount  = sale.get("credit_amount", sale.get("total_amount", 0))
+        settled_amount = sale.get("credit_settled_amount", 0) + payload.amount
+        db[Collections.SALES].update_one(
+            {"_id": payload.sale_id},
+            {"$set": {
+                "credit_settled_amount": settled_amount,
+                "credit_settled":        settled_amount >= credit_amount - 0.001,
+            }}
+        )
 
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],

@@ -5,6 +5,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.models.stock_transfer import StockTransferCreate, StockTransferResponse
 from app.models.common import PaginatedResponse
+from app.utils.notify import notify_branch_users
 
 router = APIRouter(prefix="/inventory/stock-transfers", tags=["Inventory"])
 
@@ -82,6 +83,18 @@ async def create_transfer(
     }
     _resolve_transfer(data, db)
     db[Collections.STOCK_TRANSFERS].insert_one(data)
+
+    item_count = len(data.get("items", []))
+    notify_branch_users(
+        db,
+        branch_id=data["destination_branch_id"],
+        type="TRANSFER_REQUEST",
+        title="Incoming stock transfer",
+        message=f"Stock transfer from {data.get('source_branch_name', 'another branch')} with {item_count} item(s) awaits confirmation.",
+        action_url="/inventory/stock-transfers",
+        exclude_user_id=current_user["id"],
+    )
+
     return StockTransferResponse(**doc_to_dict(data))
 
 

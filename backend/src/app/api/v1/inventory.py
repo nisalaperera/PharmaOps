@@ -1,11 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import csv, io, re
 from app.core.database import get_db, Collections, doc_to_dict, new_id
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.models.inventory import InventoryResponse, InventoryUpdate, StockInPayload, StockInCreatePayload, StockOutPayload
-from app.models.common import PaginatedResponse
+from app.models.common import PaginatedResponse, ImportResult, ImportRowError
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
@@ -99,6 +99,187 @@ async def export_inventory(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=inventory_export.csv"},
     )
+
+
+# ── Stock-In Import Template ──────────────────────────────────────────────────
+# Must be declared before /{inventory_id} to avoid path-parameter capture.
+
+@router.get("/stock-in/import/template")
+async def download_stock_in_import_template(
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
+):
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "product_name", "batch_number", "expiry_date",
+        "quantity", "purchase_price", "selling_price",
+        "sku", "supplier_name", "branch_id",
+    ])
+    # Sample row
+    writer.writerow([
+        "Paracetamol 500mg", "BATCH-001", "2027-06-01",
+        "100", "5.50", "8.00",
+        "TAB500", "MedSupply Co.", "",
+    ])
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=stock_in_import_template.csv"},
+    )
+
+
+# ── Stock-In Bulk Import ───────────────────────────────────────────────────────
+# Must be declared before /{inventory_id} to avoid path-parameter capture.
+
+REQUIRED_IMPORT_COLUMNS = {"product_name", "batch_number", "expiry_date", "quantity", "purchase_price", "selling_price"}
+EXPIRY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@router.post("/stock-in/import", response_model=ImportResult, status_code=200)
+async def import_stock_in(
+    file:         UploadFile = File(...),
+    current_user: dict       = Depends(require_min_role("BRANCH_MANAGER")),
+):
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are accepted.")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")  # strip BOM if present
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File must be UTF-8 encoded.")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no header row.")
+
+    headers = {h.strip().lower() for h in reader.fieldnames}
+    missing = REQUIRED_IMPORT_COLUMNS - headers
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required columns: {', '.join(sorted(missing))}",
+        )
+
+    db       = get_db()
+    result   = ImportResult()
+    is_branch_user = current_user["role"] in BRANCH_ROLES
+
+    for row_index, raw_row in enumerate(reader, start=2):
+        row = {k.strip().lower(): (v or "").strip() for k, v in raw_row.items()}
+
+        def row_error(msg: str):
+            result.failed += 1
+            result.errors.append(ImportRowError(row=row_index, message=msg))
+
+        # ── Required field validation ──────────────────────────────────────────
+        product_name   = row.get("product_name", "")
+        batch_number   = row.get("batch_number", "")
+        expiry_date    = row.get("expiry_date", "")
+        quantity_str   = row.get("quantity", "")
+        purchase_str   = row.get("purchase_price", "")
+        selling_str    = row.get("selling_price", "")
+
+        if not product_name:
+            row_error("product_name is required"); continue
+        if not batch_number:
+            row_error("batch_number is required"); continue
+        if not expiry_date:
+            row_error("expiry_date is required"); continue
+        if not EXPIRY_DATE_RE.match(expiry_date):
+            row_error("expiry_date must be in yyyy-MM-dd format"); continue
+
+        try:
+            quantity = int(quantity_str)
+            if quantity < 1:
+                raise ValueError
+        except ValueError:
+            row_error("quantity must be a positive integer"); continue
+
+        try:
+            purchase_price = float(purchase_str)
+            if purchase_price < 0:
+                raise ValueError
+        except ValueError:
+            row_error("purchase_price must be a non-negative number"); continue
+
+        try:
+            selling_price = float(selling_str)
+            if selling_price < 0:
+                raise ValueError
+        except ValueError:
+            row_error("selling_price must be a non-negative number"); continue
+
+        # ── Branch resolution ──────────────────────────────────────────────────
+        if is_branch_user:
+            branch_id = current_user["branch_id"]
+        else:
+            branch_id = row.get("branch_id", "").strip() or current_user.get("branch_id")
+            if not branch_id:
+                row_error("branch_id is required for org-level users"); continue
+            if not db[Collections.BRANCHES].find_one({"_id": branch_id}):
+                row_error(f"Branch '{branch_id}' not found"); continue
+
+        # ── Product lookup ─────────────────────────────────────────────────────
+        product = db[Collections.PRODUCTS].find_one(
+            {"name": {"$regex": f"^{re.escape(product_name)}$", "$options": "i"}},
+            {"_id": 1, "name": 1},
+        )
+        if not product:
+            row_error(f"Product '{product_name}' not found"); continue
+
+        product_id    = product["_id"]
+        resolved_name = product["name"]
+
+        # ── Find or create inventory record ────────────────────────────────────
+        doc = db[Collections.INVENTORY].find_one({"product_id": product_id, "branch_id": branch_id})
+        is_new_inventory = doc is None
+
+        if is_new_inventory:
+            now = datetime.now(timezone.utc).isoformat()
+            doc = {
+                "_id":             new_id(),
+                "branch_id":       branch_id,
+                "product_id":      product_id,
+                "product_name":    resolved_name,
+                "batches":         [],
+                "total_quantity":  0,
+                "min_stock_level": 0,
+                "is_low_stock":    False,
+                "created_at":      now,
+                "updated_at":      now,
+            }
+            db[Collections.INVENTORY].insert_one(doc)
+
+        # ── Add or increment batch ─────────────────────────────────────────────
+        batches  = list(doc.get("batches", []))
+        existing = next((b for b in batches if b["batch_number"] == batch_number), None)
+
+        if existing:
+            existing["quantity"] += quantity
+        else:
+            batches.append({
+                "batch_number":   batch_number,
+                "expiry_date":    expiry_date,
+                "quantity":       quantity,
+                "sku":            row.get("sku", ""),
+                "purchase_price": purchase_price,
+                "selling_price":  selling_price,
+                "supplier_id":    "",
+                "supplier_name":  row.get("supplier_name", ""),
+                "received_date":  datetime.now(timezone.utc).date().isoformat(),
+            })
+
+        updates = _recalculate_inventory(doc, batches)
+        db[Collections.INVENTORY].update_one({"_id": doc["_id"]}, {"$set": updates})
+
+        if is_new_inventory:
+            result.created += 1
+        else:
+            result.updated += 1
+
+    return result
 
 
 # ── Get one ───────────────────────────────────────────────────────────────────

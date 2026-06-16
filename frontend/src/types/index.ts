@@ -21,8 +21,9 @@ export type PurchaseOrderStatus =
   | "CANCELLED";
 
 export type GRNStatus                     = "PENDING" | "COMPLETED" | "PARTIAL";
-export type PurchaseInvoiceStatus         = "PENDING" | "COMPLETED" | "PARTIAL";
+export type PurchaseInvoiceStatus         = "DRAFT" | "RECEIVED" | "VERIFIED";
 export type PurchaseInvoicePaymentStatus  = "UNPAID" | "PARTIALLY_PAID" | "PAID";
+export type PurchasePaymentMethod         = "CASH" | "CHEQUE" | "BANK_TRANSFER";
 export type SalesOrderStatus              = "DRAFT" | "CONFIRMED" | "INVOICED" | "CANCELLED";
 export type SaleSource                    = "POS" | "ORDER";
 
@@ -269,15 +270,30 @@ export interface SupplierAgencyOption {
 // ─── Purchase Order ───────────────────────────────────────────────────────────
 
 export interface PurchaseOrderItem {
-  product_id:   string;
-  product_name: string;
-  quantity:     number;
-  unit_price:   number;
-  total_price:  number;
+  product_id:    string;
+  product_name:  string;
+  sku:           string;
+  unit_quantity: number;
+  free_quantity: number;
+  discount:      number;
+  unit_price:    number;
+  line_total:    number;
+}
+
+export interface PurchaseOrderReturnItem {
+  product_id:    string;
+  product_name:  string;
+  sku:           string;
+  unit_quantity: number;
+  free_quantity: number;
+  unit_price:    number;
+  line_total:    number;
 }
 
 export interface PurchaseOrder {
   id:               string;
+  order_number:     string;
+  order_date:       string;
   branch_id:        string;
   supplier_id:      string;
   supplier_name:    string;
@@ -285,7 +301,9 @@ export interface PurchaseOrder {
   channel_name:     string;
   credit_term_days: number;
   items:            PurchaseOrderItem[];
+  return_items:     PurchaseOrderReturnItem[];
   total_amount:     number;
+  return_amount:    number;
   status:           PurchaseOrderStatus;
   created_by:       string;
   approved_by?:     string;
@@ -323,31 +341,66 @@ export interface GoodsReceivedNote {
 }
 
 export interface PaymentEntry {
+  payment_id?:    string;
   amount:         number;
   payment_date:   string;
-  payment_method: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE";
+  payment_method: PurchasePaymentMethod;
+  reference?:     string;
+}
+
+export interface PurchaseInvoiceItem {
+  product_id:    string;
+  product_name:  string;
+  sku:           string;
+  batch_number:  string;
+  expiry_date:   string;
+  unit_quantity: number;
+  free_quantity: number;
+  discount:      number;
+  unit_price:    number;
+  selling_price: number;
+  line_total:    number;
+}
+
+export interface PurchaseReturnItem {
+  product_id:   string;
+  product_name: string;
+  batch_number: string;
+  quantity:     number;
+  unit_price:   number;
+  line_total:   number;
 }
 
 export interface PurchaseInvoice {
-  id:                   string;
-  purchase_order_id:    string;
-  branch_id:            string;
-  supplier_id:          string;
-  supplier_name:        string;
-  channel_id:           string;
-  channel_name:         string;
-  items:                GRNItem[];
-  invoice_number:       string;
-  invoice_date:         string;
-  supplier_invoice_ref?: string;
-  status:               PurchaseInvoiceStatus;
-  payment_status:       PurchaseInvoicePaymentStatus;
-  payment_entries:      PaymentEntry[];
-  received_by:          string;
-  received_at:          string;
-  notes?:               string;
-  created_at:           string;
-  updated_at:           string;
+  id:                       string;
+  invoice_number:           string;
+  invoice_date:             string;
+  branch_id:                string;
+  supplier_id:              string;
+  supplier_name:            string;
+  channel_id:               string;
+  channel_name:             string;
+  credit_term_days:         number;
+  purchase_order_id?:       string | null;
+  distributor_invoice_no?:  string | null;
+  distributor_invoice_date?: string | null;
+  items:                    PurchaseInvoiceItem[];
+  return_items:             PurchaseReturnItem[];
+  manual_total_amount?:     number | null;
+  manual_return_amount?:    number | null;
+  total_amount:             number;
+  return_amount:            number;
+  net_amount:               number;
+  status:                   PurchaseInvoiceStatus;
+  payment_status:           PurchaseInvoicePaymentStatus;
+  paid_amount:              number;
+  payment_entries:          PaymentEntry[];
+  verified_by?:             string | null;
+  verified_at?:             string | null;
+  inventory_posted:         boolean;
+  notes?:                   string;
+  created_at:               string;
+  updated_at:               string;
 }
 
 // ─── Sales Order ──────────────────────────────────────────────────────────────
@@ -499,6 +552,9 @@ export interface Sale {
   sales_order_id?:  string;
   cashier_id:       string;
   cashier_name:     string;
+  credit_amount?:         number;
+  credit_settled_amount?: number;
+  credit_settled?:        boolean;
   created_at:       string;
   updated_at?:      string;
 }
@@ -520,6 +576,24 @@ export interface CreditPayment {
   cashier_name:    string;
   created_at:      string;
   updated_at:      string;
+}
+
+export interface CustomerLedgerEntry {
+  entry_type:      "CREDIT_SALE" | "PAYMENT";
+  id:              string;
+  amount:          number;
+  settled_amount?: number;
+  settled?:        boolean;
+  status?:         string;
+  payment_method?: string;
+  sale_id?:        string;
+  created_at:      string;
+}
+
+export interface CustomerLedger {
+  outstanding_balance: number;
+  credit_limit:        number;
+  entries:             CustomerLedgerEntry[];
 }
 
 // ─── Stock Transfer ───────────────────────────────────────────────────────────
@@ -626,6 +700,9 @@ export interface Payroll {
   is_paid:          boolean;
   paid_at?:         string;
   paid_by?:         string;
+  paid_source_type?: string;
+  paid_source_id?:   string;
+  paid_source_name?: string;
   created_at:       string;
   updated_at:       string;
 }
@@ -634,30 +711,60 @@ export interface Payroll {
 
 export interface Notification {
   id: string;
-  userId: string;
-  branchId?: string;
+  user_id: string;
+  branch_id?: string;
   type: NotificationType;
   title: string;
   message: string;
-  isRead: boolean;
-  actionUrl?: string;
-  createdAt: string;
+  is_read: boolean;
+  action_url?: string;
+  created_at: string;
 }
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 export interface AuditLog {
   id: string;
-  userId: string;
-  userEmail: string;
-  userRole: UserRole;
-  branchId?: string;
+  user_id: string;
+  user_email: string;
+  user_role: UserRole;
+  branch_id?: string;
   action: string;
   resource: string;
-  resourceId?: string;
+  resource_id?: string;
   details?: Record<string, unknown>;
-  ipAddress?: string;
+  ip_address?: string;
   timestamp: string;
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export interface DashboardRecentSale {
+  id:             string;
+  customer_name:  string;
+  total_amount:   number;
+  payment_method: string;
+  created_at?:    string;
+}
+
+export interface DashboardBranchSummary {
+  branch_id:        string;
+  branch_name:      string;
+  today_sales:      number;
+  low_stock_count:  number;
+  expiring_count:   number;
+  pending_po_count: number;
+}
+
+export interface DashboardStats {
+  total_branches:   number;
+  today_sales:      number;
+  month_sales:      number;
+  low_stock_count:  number;
+  expiring_count:   number;
+  pending_po_count: number;
+  recent_sales:     DashboardRecentSale[];
+  branch_summaries: DashboardBranchSummary[];
 }
 
 // ─── Reports ──────────────────────────────────────────────────────────────────

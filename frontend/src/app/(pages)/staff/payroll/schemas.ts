@@ -14,5 +14,12 @@ export const payrollCreateSchema = z.object({
   deductions: z.array(deductionSchema).default([]),
 });
 
+export const payrollPaySchema = z.object({
+  source_type: z.enum(["CASH_REGISTRY", "BANK_ACCOUNT"]),
+  source_id:   z.string().min(1, "Payment source is required"),
+  notes:       z.string().optional(),
+});
+
 export type DeductionValues     = z.infer<typeof deductionSchema>;
 export type PayrollCreateValues = z.infer<typeof payrollCreateSchema>;
+export type PayrollPayValues    = z.infer<typeof payrollPaySchema>;

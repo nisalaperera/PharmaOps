@@ -70,7 +70,14 @@
       "PowerShell(py -3.11 --version 2>$null)",
       "PowerShell(py -3.12 --version 2>$null)",
       "PowerShell(py -3.13 --version 2>$null)",
-      "PowerShell(Get-ChildItem -Path \"F:\\\\Project\\\\PharmaOps\" -Recurse -Name | Where-Object {$_ -match \"\\\\.\\(bat|ps1\\)$\"})"
+      "PowerShell(Get-ChildItem -Path \"F:\\\\Project\\\\PharmaOps\" -Recurse -Name | Where-Object {$_ -match \"\\\\.\\(bat|ps1\\)$\"})",
+      "Bash(node -e ' *)",
+      "PowerShell(\\(Get-Content \"F:\\\\Project\\\\PharmaOps\\\\frontend\\\\src\\\\lib\\\\constants.ts\" | Measure-Object -Line\\).Lines)",
+      "PowerShell(Set-Location F:\\\\Project\\\\PharmaOps\\\\backend; $env:PYTHONPATH = \"src\"; python -m uvicorn app.main:app --port 8765)",
+      "PowerShell($body = '{\"email\":\"ratelimit-test@example.com\",\"password\":\"wrong\"}'; for \\($i = 1; $i -le 7; $i++\\) { try { Invoke-WebRequest -Uri \"http://127.0.0.1:8765/api/v1/auth/login\" -Method POST -Body $body -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 10 | Out-Null; \"Attempt ${i}: 200\" } catch { $code = $_.Exception.Response.StatusCode.value__; \"Attempt ${i}: $code\" } })",
+      "Bash(PYTHONPATH=src python -c \"import ast; [ast.parse\\(open\\(f\\).read\\(\\)\\) for f in ['src/app/models/purchase_invoice.py','src/app/api/v1/purchase_invoices.py','src/app/api/v1/purchase_orders.py','src/app/main.py']]; print\\('syntax ok'\\)\")",
+      "Bash(PYTHONPATH=src python -c \"import app.main; print\\('app ok'\\)\")",
+      "mcp__plugin_mongodb_mongodb__find"
     ]
   }
 }

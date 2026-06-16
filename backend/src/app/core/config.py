@@ -26,6 +26,13 @@ class Settings(BaseSettings):
     app_env:         str = "development"
     allowed_origins: str = "http://localhost:3000"
 
+    # Login rate limiting (in-memory, per process)
+    login_max_attempts:   int = 5
+    login_window_minutes: int = 15
+
+    # Audit log retention in days (0 = keep forever)
+    audit_log_retention_days: int = 365
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.allowed_origins.split(",")]

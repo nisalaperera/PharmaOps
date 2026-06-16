@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const creditPaymentSchema = z.object({
-  patient_id:     z.string().min(1, "Customer is required"),
+  customer_id:    z.string().min(1, "Customer is required"),
   sale_id:        z.string().optional(),
   amount:         z.number({ invalid_type_error: "Amount is required" }).positive("Must be greater than 0"),
   payment_method: z.enum(["CASH", "CARD", "BANK_TRANSFER", "CHEQUE"]),

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
-  FileText, Plus, Eye, SlidersHorizontal,
+  FileText, Plus, Eye, Pencil, Trash2, CreditCard, SlidersHorizontal,
   FileDown,
 } from "lucide-react";
 import jsPDF from "jspdf";
@@ -13,21 +14,27 @@ import { DataTable, type Column } from "@/components/common/DataTable";
 import { Pagination }             from "@/components/common/Pagination";
 import { SearchBar }              from "@/components/common/SearchBar";
 import { FilterBar }              from "@/components/common/FilterBar";
+import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
 import { useAuth }                from "@/hooks/useAuth";
 import { usePagination }          from "@/hooks/usePagination";
-import { apiGet, apiDownloadFile, downloadBlob } from "@/lib/api-client";
+import { apiGet, apiDelete, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
-import { GRN_STATUS_FILTER_OPTIONS, PURCHASE_INVOICE_PAYMENT_STATUS_FILTER_OPTIONS } from "@/lib/constants";
+import { PURCHASE_INVOICE_STATUS_FILTER_OPTIONS, PURCHASE_INVOICE_PAYMENT_STATUS_FILTER_OPTIONS } from "@/lib/constants";
 import {
-  GRN_STATUS_VARIANT, GRN_STATUS_LABEL,
+  PURCHASE_INVOICE_STATUS_VARIANT, PURCHASE_INVOICE_STATUS_LABEL,
   PURCHASE_INVOICE_PAYMENT_STATUS_VARIANT, PURCHASE_INVOICE_PAYMENT_STATUS_LABEL,
 } from "@/lib/badges";
 import APP_CONFIG                 from "@/lib/config";
 import { PurchaseInvoiceModal }   from "./components/PurchaseInvoiceModal";
 import { PurchaseInvoiceViewModal } from "./components/PurchaseInvoiceViewModal";
+import { MultiPaymentModal }      from "./components/MultiPaymentModal";
 import type { PurchaseInvoice, Branch, PaginatedResponse } from "@/types";
+
+function lkr(n: number): string {
+  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
 
 // ─── Export helpers ───────────────────────────────────────────────────────────
 
@@ -37,19 +44,21 @@ function exportDateStamp(): string {
 
 function buildRow(inv: PurchaseInvoice, branchNameMap: Record<string, string>): string[] {
   return [
-    inv.invoice_number || `#${inv.id.slice(0, 8).toUpperCase()}`,
-    `#${inv.purchase_order_id.slice(0, 8).toUpperCase()}`,
+    inv.invoice_number,
+    inv.invoice_date?.slice(0, 10) ?? "",
     branchNameMap[inv.branch_id] ?? inv.branch_id,
     inv.supplier_name,
-    String(inv.items.length),
-    inv.invoice_date?.slice(0, 10) ?? "",
-    GRN_STATUS_LABEL[inv.status],
+    inv.channel_name,
+    lkr(inv.total_amount),
+    lkr(inv.return_amount),
+    lkr(inv.net_amount),
+    PURCHASE_INVOICE_STATUS_LABEL[inv.status],
     PURCHASE_INVOICE_PAYMENT_STATUS_LABEL[inv.payment_status],
   ];
 }
 
 function exportSelectedCsv(selected: PurchaseInvoice[], branchNameMap: Record<string, string>) {
-  const header  = ["Invoice #", "PO #", "Branch", "Supplier", "Items", "Invoice Date", "Status", "Payment"];
+  const header  = ["Invoice #", "Invoice Date", "Branch", "Supplier", "Channel", "Total", "Return", "Net", "Status", "Payment"];
   const rows    = selected.map((inv) => buildRow(inv, branchNameMap));
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
@@ -59,7 +68,7 @@ function exportSelectedCsv(selected: PurchaseInvoice[], branchNameMap: Record<st
 
 async function exportSelectedPdf(selected: PurchaseInvoice[], branchNameMap: Record<string, string>) {
   const doc  = new jsPDF();
-  const head = [["Invoice #", "PO #", "Branch", "Supplier", "Items", "Invoice Date", "Status", "Payment"]];
+  const head = [["Invoice #", "Invoice Date", "Branch", "Supplier", "Channel", "Total", "Return", "Net", "Status", "Payment"]];
   const body = selected.map((inv) => buildRow(inv, branchNameMap));
 
   let cursorY = 14;
@@ -95,22 +104,27 @@ async function exportSelectedPdf(selected: PurchaseInvoice[], branchNameMap: Rec
 
 export default function PurchaseInvoicesPage() {
   const { permissions } = useAuth();
+  const queryClient = useQueryClient();
   const canCreate = permissions?.can("BRANCH_USER") ?? false;
+  const canDelete = permissions?.can("BRANCH_MANAGER") ?? false;
 
   const [statusFilter,        setStatusFilter]        = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
   const [branchFilter,        setBranchFilter]        = useState("");
   const [filterVisible,       setFilterVisible]       = useState(false);
 
-  const [modalOpen,  setModalOpen]  = useState(false);
-  const [viewInvoice, setViewInvoice] = useState<PurchaseInvoice | null>(null);
+  const [modalOpen,    setModalOpen]    = useState(false);
+  const [editInvoice,  setEditInvoice]  = useState<PurchaseInvoice | null>(null);
+  const [viewInvoice,  setViewInvoice]  = useState<PurchaseInvoice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PurchaseInvoice | null>(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
 
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
-    usePagination({ initialSortField: "received_at", initialSortDirection: "desc" });
+    usePagination({ initialSortField: "created_at", initialSortDirection: "desc" });
 
   const filters = {
     ...(statusFilter        && { status:         statusFilter }),
@@ -182,22 +196,25 @@ export default function PurchaseInvoicesPage() {
     await exportSelectedPdf(selectedItems, branchNameMap);
   }
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiDelete(`/purchases/invoices/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-invoices"] });
+      showToast("success", "Invoice Deleted", "The purchase invoice has been removed.");
+      setDeleteTarget(null);
+    },
+    onError: (err: { message?: string }) => showToast("error", "Delete Failed", err?.message ?? "Something went wrong."),
+  });
+
+  function openEdit(inv: PurchaseInvoice) { setEditInvoice(inv); setModalOpen(true); }
+
   const columns: Column<PurchaseInvoice>[] = [
     {
       key:    "invoice_number",
       header: "Invoice #",
       render: (row) => (
         <span className="text-sm font-mono font-semibold" style={{ color: "var(--color-text)" }}>
-          {row.invoice_number || `#${row.id.slice(0, 8).toUpperCase()}`}
-        </span>
-      ),
-    },
-    {
-      key:    "purchase_order_id",
-      header: "Purchase Order",
-      render: (row) => (
-        <span className="text-sm font-mono" style={{ color: "var(--color-text-muted)" }}>
-          #{row.purchase_order_id.slice(0, 8).toUpperCase()}
+          {row.invoice_number}
         </span>
       ),
     },
@@ -228,11 +245,12 @@ export default function PurchaseInvoicesPage() {
       ),
     },
     {
-      key:    "items",
-      header: "Items",
-      render: (row) => (
-        <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-          {row.items.length} item{row.items.length !== 1 ? "s" : ""}
+      key:      "net_amount",
+      header:   "Net (LKR)",
+      sortable: true,
+      render:   (row) => (
+        <span className="text-sm tabular-nums font-semibold block text-right" style={{ color: "var(--color-text)" }}>
+          {lkr(row.net_amount)}
         </span>
       ),
     },
@@ -251,8 +269,8 @@ export default function PurchaseInvoicesPage() {
       header:   "Status",
       sortable: true,
       render:   (row) => (
-        <Badge variant={GRN_STATUS_VARIANT[row.status]}>
-          {GRN_STATUS_LABEL[row.status]}
+        <Badge variant={PURCHASE_INVOICE_STATUS_VARIANT[row.status]}>
+          {PURCHASE_INVOICE_STATUS_LABEL[row.status]}
         </Badge>
       ),
     },
@@ -269,17 +287,41 @@ export default function PurchaseInvoicesPage() {
     {
       key:    "actions",
       header: "Actions",
-      width:  "72px",
-      render: (row) => (
-        <button
-          title="View Details"
-          onClick={(e) => { e.stopPropagation(); setViewInvoice(row); }}
-          className="p-1.5 rounded-md transition-colors hover:bg-[var(--color-surface-2)]"
-          style={{ color: "var(--color-text-muted)" }}
-        >
-          <Eye className="w-3.5 h-3.5" />
-        </button>
-      ),
+      width:  "140px",
+      render: (row) => {
+        const isLocked = row.status === "VERIFIED";
+        return (
+          <div className="flex items-center gap-1">
+            <button
+              title="View Details"
+              onClick={(e) => { e.stopPropagation(); setViewInvoice(row); }}
+              className="p-1.5 rounded-md transition-colors hover:bg-[var(--color-surface-2)]"
+              style={{ color: "var(--color-text-muted)" }}
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+            {canCreate && !isLocked && (
+              <button
+                title="Edit"
+                onClick={(e) => { e.stopPropagation(); openEdit(row); }}
+                className="p-1.5 rounded-md transition-colors hover:bg-[var(--color-surface-2)]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {canDelete && !isLocked && row.paid_amount <= 0 && (
+              <button
+                title="Delete"
+                onClick={(e) => { e.stopPropagation(); setDeleteTarget(row); }}
+                className="p-1.5 rounded-md transition-colors hover:bg-danger-50 dark:hover:bg-danger-900/20 text-danger-500"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -291,7 +333,7 @@ export default function PurchaseInvoicesPage() {
             <FileText className="w-6 h-6" style={{ color: "var(--color-text-muted)" }} />
             <h1 className="page-title">Purchase Invoices</h1>
           </div>
-          <p className="page-subtitle mt-1">Record and track purchase invoices against approved orders</p>
+          <p className="page-subtitle mt-1">View, search, and manage purchase invoices. Create new invoices from the GRN page.</p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -317,9 +359,11 @@ export default function PurchaseInvoicesPage() {
 
           {canCreate && (
             <div className="flex items-center gap-2 pl-3 ml-1 border-l flex-shrink-0" style={{ borderColor: "var(--color-border)" }}>
-              <Button variant="primary" leftIcon={<Plus className="w-4 h-4" />} onClick={() => setModalOpen(true)}>
-                New Invoice
-              </Button>
+              <Link href="/purchases/grn">
+                <Button variant="primary" leftIcon={<Plus className="w-4 h-4" />}>
+                  New Invoice
+                </Button>
+              </Link>
             </div>
           )}
         </div>
@@ -327,7 +371,7 @@ export default function PurchaseInvoicesPage() {
 
       <FilterBar isVisible={filterVisible} hasActiveFilters={hasActiveFilters} onClear={clearFilters} onHide={hideFilters}>
         <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); goToPage(1); }} className="form-select w-auto">
-          {GRN_STATUS_FILTER_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+          {PURCHASE_INVOICE_STATUS_FILTER_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </select>
 
         <select value={paymentStatusFilter} onChange={(e) => { setPaymentStatusFilter(e.target.value); goToPage(1); }} className="form-select w-auto">
@@ -392,6 +436,11 @@ export default function PurchaseInvoicesPage() {
               {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
             </p>
             <div className="flex items-center gap-2">
+              {canCreate && !allPagesSelected && selectedItems.some((i) => i.net_amount - i.paid_amount > 0.001) && (
+                <Button variant="primary" size="sm" leftIcon={<CreditCard className="w-3.5 h-3.5" />} onClick={() => setPayModalOpen(true)}>
+                  Record Payment
+                </Button>
+              )}
               <Button variant="outline" size="sm" leftIcon={<FileDown className="w-3.5 h-3.5" />} onClick={handleExportCsv} isLoading={isExportingCsv}>
                 Export CSV
               </Button>
@@ -411,6 +460,7 @@ export default function PurchaseInvoicesPage() {
       <PurchaseInvoiceModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
+        editing={editInvoice}
       />
 
       <PurchaseInvoiceViewModal
@@ -418,6 +468,23 @@ export default function PurchaseInvoicesPage() {
         onClose={() => setViewInvoice(null)}
         invoice={viewInvoice}
         branchNameMap={branchNameMap}
+      />
+
+      <MultiPaymentModal
+        isOpen={payModalOpen}
+        onClose={() => setPayModalOpen(false)}
+        invoices={selectedItems}
+      />
+
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        title="Delete Purchase Invoice"
+        body={`Are you sure you want to delete invoice ${deleteTarget?.invoice_number}? This cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
       />
     </div>
   );

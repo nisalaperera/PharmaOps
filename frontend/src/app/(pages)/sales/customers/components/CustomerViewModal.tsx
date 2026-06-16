@@ -1,12 +1,14 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { Modal }  from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge }  from "@/components/ui/Badge";
 import { X, Pencil } from "lucide-react";
+import { apiGet } from "@/lib/api-client";
 import { formatDateTime } from "@/lib/utils";
 import { getActiveStatusVariant } from "@/lib/badges";
-import type { Customer } from "@/types";
+import type { Customer, CustomerLedger } from "@/types";
 
 interface CustomerViewModalProps {
   customer: Customer | null;
@@ -25,6 +27,12 @@ function Field({ label, value }: { label: string; value?: string | number | null
 }
 
 export function CustomerViewModal({ customer, isOpen, onClose, onEdit }: CustomerViewModalProps) {
+  const { data: ledger } = useQuery<CustomerLedger>({
+    queryKey: ["customer-ledger", customer?.id],
+    queryFn:  () => apiGet<CustomerLedger>(`/customers/${customer!.id}/ledger`),
+    enabled:  isOpen && !!customer,
+  });
+
   if (!customer) return null;
 
   const initials = customer.full_name
@@ -68,6 +76,39 @@ export function CustomerViewModal({ customer, isOpen, onClose, onEdit }: Custome
           <Field label="Outstanding"   value={customer.outstanding_balance.toFixed(2)} />
           {customer.address && <div className="col-span-2"><Field label="Address" value={customer.address} /></div>}
         </div>
+
+        {/* Credit ledger */}
+        {ledger && ledger.entries.length > 0 && (
+          <div>
+            <p className="text-xs font-medium mb-2" style={{ color: "var(--color-text-muted)" }}>Credit Ledger</p>
+            <div className="rounded-xl divide-y max-h-48 overflow-y-auto" style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}>
+              {ledger.entries.map((entry) => (
+                <div key={`${entry.entry_type}-${entry.id}`} className="flex items-center justify-between px-4 py-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {entry.entry_type === "CREDIT_SALE" ? (
+                        <Badge variant={entry.settled ? "success" : "danger"}>
+                          {entry.settled ? "Settled" : "Credit Sale"}
+                        </Badge>
+                      ) : (
+                        <Badge variant="info">Payment</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+                      {entry.created_at ? formatDateTime(entry.created_at) : "—"}
+                    </p>
+                  </div>
+                  <span
+                    className="text-sm font-semibold tabular-nums ml-4"
+                    style={{ color: entry.entry_type === "PAYMENT" ? "var(--color-success, #059669)" : "var(--color-text)" }}
+                  >
+                    {entry.entry_type === "PAYMENT" ? "-" : "+"}{entry.amount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Audit */}
         <div className="border-t pt-3 grid grid-cols-2 gap-3 text-xs" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>

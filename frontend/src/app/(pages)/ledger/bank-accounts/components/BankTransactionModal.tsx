@@ -81,7 +81,7 @@ export function BankTransactionModal({
         onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
         className="space-y-4"
       >
-        {/* Current Balance â€” read-only */}
+        {/* Current Balance & read-only */}
         <div className="w-full">
           <label className="form-label">Current Balance</label>
           <div

@@ -2,7 +2,7 @@
 
 import { useState, useCallback }                                from "react";
 import { useQuery, keepPreviousData }                           from "@tanstack/react-query";
-import { Archive, Eye, Pencil, PackagePlus, PackageMinus, SlidersHorizontal, FileDown, FileText, AlertTriangle } from "lucide-react";
+import { Archive, Eye, Pencil, PackagePlus, PackageMinus, SlidersHorizontal, FileDown, FileText, AlertTriangle, Upload, Clock } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format }                                               from "date-fns";
@@ -22,6 +22,7 @@ import { InventoryModal }    from "./components/InventoryModal";
 import { InventoryViewModal } from "./components/InventoryViewModal";
 import { StockInModal }       from "./components/StockInModal";
 import { StockOutModal }      from "./components/StockOutModal";
+import { StockInImportModal } from "./components/StockInImportModal";
 import type { InventoryItem, Branch, PaginatedResponse }        from "@/types";
 
 // ─── Export helpers ───────────────────────────────────────────────────────────
@@ -106,6 +107,18 @@ async function exportSelectedPdf(selected: InventoryItem[], branchName?: string)
   doc.save(`inventory${branchSlug}_${exportDateStamp()}.pdf`);
 }
 
+// ─── Expiry helpers ───────────────────────────────────────────────────────────
+
+const EXPIRY_WARNING_DAYS = 90;
+
+function getExpiryQty(item: InventoryItem): number {
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() + EXPIRY_WARNING_DAYS);
+  return item.batches
+    .filter((b) => new Date(b.expiry_date) <= threshold)
+    .reduce((sum, b) => sum + b.quantity, 0);
+}
+
 // ─── Inventory page ───────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
@@ -122,7 +135,8 @@ export default function InventoryPage() {
   const [viewItem,     setViewItem]     = useState<InventoryItem | null>(null);
   const [stockInOpen,  setStockInOpen]  = useState(false);
   const [stockInItem,  setStockInItem]  = useState<InventoryItem | null>(null);
-  const [stockOutItem, setStockOutItem] = useState<InventoryItem | null>(null);
+  const [stockOutItem,  setStockOutItem]  = useState<InventoryItem | null>(null);
+  const [importOpen,    setImportOpen]    = useState(false);
 
   function openStockIn(item: InventoryItem | null) {
     setStockInItem(item);
@@ -261,6 +275,23 @@ export default function InventoryPage() {
       ),
     },
     {
+      key:    "expiry_qty",
+      header: "Expiry Qty",
+      render: (row) => {
+        const expiryQty = getExpiryQty(row);
+        return expiryQty > 0 ? (
+          <div className="flex items-center gap-1">
+            <Clock className="w-3 h-3 text-amber-500 flex-shrink-0" />
+            <span className="text-sm font-medium tabular-nums text-amber-600 dark:text-amber-400">
+              {expiryQty.toLocaleString()}
+            </span>
+          </div>
+        ) : (
+          <span className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>—</span>
+        );
+      },
+    },
+    {
       key:      "min_stock_level",
       header:   "Min Stock",
       sortable: true,
@@ -346,14 +377,24 @@ export default function InventoryPage() {
 
         <div className="flex items-center gap-2 flex-wrap">
           {canManage && (
-            <Button
-              variant="primary"
-              size="sm"
-              leftIcon={<PackagePlus className="w-3.5 h-3.5" />}
-              onClick={() => openStockIn(null)}
-            >
-              Stock In
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Upload className="w-3.5 h-3.5" />}
+                onClick={() => setImportOpen(true)}
+              >
+                Import
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                leftIcon={<PackagePlus className="w-3.5 h-3.5" />}
+                onClick={() => openStockIn(null)}
+              >
+                Stock In
+              </Button>
+            </>
           )}
 
           <Button
@@ -533,6 +574,11 @@ export default function InventoryPage() {
         isOpen={!!stockOutItem}
         onClose={() => setStockOutItem(null)}
         inventoryItem={stockOutItem}
+      />
+
+      <StockInImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
       />
     </div>
   );

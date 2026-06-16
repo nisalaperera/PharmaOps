@@ -85,6 +85,22 @@ export function PayrollViewModal({ isOpen, onClose, payroll, branchNameMap }: Pa
               </dd>
             </div>
           )}
+
+          {payroll.is_paid && payroll.paid_source_name && (
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>
+                Paid From
+              </dt>
+              <dd className="text-sm mt-1" style={{ color: "var(--color-text)" }}>
+                {payroll.paid_source_name}
+                {payroll.paid_source_type && (
+                  <span className="text-xs ml-1.5" style={{ color: "var(--color-text-muted)" }}>
+                    ({payroll.paid_source_type === "CASH_REGISTRY" ? "Cash Registry" : "Bank Account"})
+                  </span>
+                )}
+              </dd>
+            </div>
+          )}
         </dl>
 
         {/* ── Salary breakdown ──────────────────────────────────────────────── */}

@@ -87,9 +87,9 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
         items:       editingPO.items.map((it) => ({
           product_id:   it.product_id,
           product_name: it.product_name,
-          quantity:     it.quantity,
+          quantity:     it.unit_quantity,
           unit_price:   it.unit_price,
-          total_price:  it.total_price,
+          total_price:  it.line_total,
         })),
       });
     } else {

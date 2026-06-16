@@ -64,7 +64,7 @@ function exportCategoriesCsv(categories: ProductCategory[]) {
 async function exportCategoriesPdf(categories: ProductCategory[]) {
   const doc     = new jsPDF();
   const headers = [["Category Name", "Parent", "Description"]];
-  const body    = categories.map((c) => [c.name, c.parent_name ?? "â€”", c.description ?? ""]);
+  const body    = categories.map((c) => [c.name, c.parent_name ?? "-", c.description ?? ""]);
 
   let cursorY = 14;
   try {
@@ -230,7 +230,7 @@ export default function CategoriesPage() {
       header: "Description",
       render: (row) => (
         <p className="text-sm truncate max-w-[360px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "â€”"}
+          {row.description || "-"}
         </p>
       ),
     },

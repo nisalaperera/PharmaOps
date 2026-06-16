@@ -4,6 +4,7 @@ import {
   Truck, ShoppingCart, Receipt, ClipboardList, UserCircle,
   ArrowLeftRight, UserCog, Wallet, BarChart3, Bell, ScrollText,
   Layers, FlaskConical, Tag, Ruler, Contact, Vault, Landmark, ArrowRightLeft, BookOpen, CreditCard,
+  ClipboardCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -79,6 +80,13 @@ export const navigationConfig: NavItem[] = [
         label:        "Orders",
         href:         "/purchases/orders",
         icon:         ShoppingCart,
+        requiredRole: "BRANCH_USER",
+      },
+      {
+        id:           "purchases-grn",
+        label:        "GRN",
+        href:         "/purchases/grn",
+        icon:         ClipboardCheck,
         requiredRole: "BRANCH_USER",
       },
       {

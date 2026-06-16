@@ -175,7 +175,7 @@ export default function BankAccountsPage() {
             <Eye className="w-3.5 h-3.5" />
           </button>
 
-          {/* Deposit â€” always visible */}
+          {/* Deposit  always visible */}
           <button
             title="Deposit"
             onClick={(e) => { e.stopPropagation(); setTransactionTarget({ account: row, type: "DEPOSIT" }); }}
@@ -184,7 +184,7 @@ export default function BankAccountsPage() {
             <ArrowDownToLine className="w-3.5 h-3.5" />
           </button>
 
-          {/* Withdraw â€” always visible */}
+          {/* Withdraw  always visible */}
           <button
             title="Withdraw"
             onClick={(e) => { e.stopPropagation(); setTransactionTarget({ account: row, type: "WITHDRAWAL" }); }}

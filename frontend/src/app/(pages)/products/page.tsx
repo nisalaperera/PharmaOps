@@ -86,7 +86,7 @@ function exportSelectedPdf(selectedProducts: Product[]) {
   } catch { /* skip logo if load fails */ }
 
   doc.setFontSize(13);
-  doc.text(`${APP_CONFIG.orgName} â€” Product Catalog`, 28, yPos + 4);
+  doc.text(`${APP_CONFIG.orgName} & Product Catalog`, 28, yPos + 4);
   doc.setFontSize(9);
   doc.setTextColor(120);
   doc.text(`Exported: ${new Date().toISOString().slice(0, 10)}`, 28, yPos + 10);
@@ -280,7 +280,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.generic_name || "â€”"}
+          {row.generic_name || "-"}
         </span>
       ),
     },
@@ -290,7 +290,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.brand_name || "â€”"}
+          {row.brand_name || "-"}
         </span>
       ),
     },
@@ -300,7 +300,7 @@ export default function ProductsPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm" style={{ color: "var(--color-text)" }}>
-          {row.category_name || "â€”"}
+          {row.category_name || "-"}
         </span>
       ),
     },
@@ -315,6 +315,26 @@ export default function ProductsPage() {
           {row.basic_sku_name || "â€”"}
         </span>
       ),
+    },
+    {
+      key:    'sku_mappings',
+      header: 'SKU Mappings',
+      render: (row) =>
+        row.sku_mappings?.length ? (
+          <div className='flex flex-wrap gap-1'>
+            {row.sku_mappings.map((mapping) => (
+              <span
+                key={mapping.sku}
+                className='text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap'
+                style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary-600)' }}
+              >
+                {mapping.sku} ({mapping.basic_sku_count})
+              </span>
+            ))}
+          </div>
+        ) : (
+          <span className='text-xs' style={{ color: 'var(--color-text-muted)' }}>—</span>
+        ),
     },
     {
       key:    "is_active",

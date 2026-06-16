@@ -145,11 +145,23 @@ export default function BillingPage() {
     {
       key:    "payment_method",
       header: "Payment",
-      render: (s) => (
-        <Badge variant={PAYMENT_METHOD_VARIANT[s.payment_method] ?? "default"}>
-          {PAYMENT_METHOD_LABEL[s.payment_method] ?? s.payment_method}
-        </Badge>
-      ),
+      render: (s) => {
+        const creditDue = (s.credit_amount || s.total_amount) - (s.credit_settled_amount ?? 0);
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant={PAYMENT_METHOD_VARIANT[s.payment_method] ?? "default"}>
+              {PAYMENT_METHOD_LABEL[s.payment_method] ?? s.payment_method}
+            </Badge>
+            {s.payment_method === "CREDIT" && (
+              s.credit_settled || creditDue <= 0 ? (
+                <Badge variant="success">Settled</Badge>
+              ) : (
+                <Badge variant="danger">Due {creditDue.toFixed(2)}</Badge>
+              )
+            )}
+          </div>
+        );
+      },
     },
     {
       key:    "status",
@@ -173,7 +185,7 @@ export default function BillingPage() {
           >
             View
           </Button>
-          {s.payment_method === "CREDIT" && s.status === "COMPLETED" && s.customer_id && (
+          {s.payment_method === "CREDIT" && s.status === "COMPLETED" && s.customer_id && !s.credit_settled && (
             <Button
               variant="ghost"
               size="sm"
