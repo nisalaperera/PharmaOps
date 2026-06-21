@@ -9,6 +9,7 @@ import { Modal }                  from "@/components/ui/Modal";
 import { Button }                 from "@/components/ui/Button";
 import { Input }                  from "@/components/ui/Input";
 import { apiPost }                from "@/lib/api-client";
+import { formatAmount }           from "@/lib/utils";
 import { showToast }              from "@/lib/toast";
 import { posSettleSchema, type PosSettleValues } from "../schemas";
 import type { PosMachine, PosSettlement } from "@/types";
@@ -52,7 +53,7 @@ export function PosSettleModal({ isOpen, onClose, machine }: PosSettleModalProps
       showToast(
         "success",
         "Settlement Completed",
-        `LKR ${result.total_amount.toFixed(2)} from ${result.transaction_count} transaction(s) deposited to ${machine!.bank_account_name}.`,
+        `LKR ${formatAmount(result.total_amount)} from ${result.transaction_count} transaction(s) deposited to ${machine!.bank_account_name}.`,
       );
       onClose();
     },
@@ -84,7 +85,7 @@ export function PosSettleModal({ isOpen, onClose, machine }: PosSettleModalProps
         <div className="pt-2 border-t" style={{ borderColor: "var(--color-border)" }}>
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>Unsettled Amount</p>
           <p className="text-xl font-bold tabular-nums mt-0.5" style={{ color: "var(--color-text)" }}>
-            LKR {machine.unsettled_amount.toFixed(2)}
+            LKR {formatAmount(machine.unsettled_amount)}
           </p>
         </div>
       </div>
@@ -121,7 +122,7 @@ export function PosSettleModal({ isOpen, onClose, machine }: PosSettleModalProps
 
           <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
             All unsettled transactions will be marked settled and{" "}
-            <strong>LKR {machine.unsettled_amount.toFixed(2)}</strong> will be deposited into{" "}
+            <strong>LKR {formatAmount(machine.unsettled_amount)}</strong> will be deposited into{" "}
             <strong>{machine.bank_account_name}</strong>.
           </p>
 

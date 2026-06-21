@@ -9,6 +9,7 @@ import { Button }                                  from "@/components/ui/Button"
 import { Badge }                                   from "@/components/ui/Badge";
 import { apiPatch }                                from "@/lib/api-client";
 import { showToast }                               from "@/lib/toast";
+import { formatAmount }                            from "@/lib/utils";
 import { CHEQUE_ISSUE_STATUS_VARIANT }             from "@/lib/badges";
 import { chequeIssueStatusUpdateSchema }           from "../schemas";
 import type { ChequeIssueStatusUpdateFormValues }  from "../schemas";
@@ -72,7 +73,7 @@ export function UpdateChequeStatusModal({ isOpen, onClose, issue, bookId }: Upda
           </Badge>
         </div>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {issue.payee} · LKR {issue.amount.toFixed(2)} · {issue.issue_date}
+          {issue.payee} · LKR {formatAmount(issue.amount)} · {issue.issue_date}
         </p>
       </div>
 

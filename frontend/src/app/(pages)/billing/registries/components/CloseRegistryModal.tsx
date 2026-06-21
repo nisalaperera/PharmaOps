@@ -7,9 +7,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal }   from "@/components/ui/Modal";
 import { Button }  from "@/components/ui/Button";
 import { Input }   from "@/components/ui/Input";
-import { apiPost } from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { cn, formatAmount } from "@/lib/utils";
 import {
   closeRegistrySchema,
   type CloseRegistryValues,
@@ -50,12 +50,12 @@ export function CloseRegistryModal({ isOpen, onClose, registry }: CloseRegistryM
       apiPost<CashRegistry>(`/treasury/registries/${registry!.id}/close`, values),
     onSuccess: (_, values) => {
       queryClient.invalidateQueries({ queryKey: ["registries"] });
-      const discrepancyAmount = (values.physical_count - systemBalance).toFixed(2);
+      const discrepancyValue = values.physical_count - systemBalance;
       const discrepancyLabel  =
-        values.physical_count > systemBalance
-          ? `+LKR ${discrepancyAmount}`
-          : values.physical_count < systemBalance
-          ? `-LKR ${Math.abs(Number(discrepancyAmount)).toFixed(2)}`
+        discrepancyValue > 0
+          ? `+LKR ${formatAmount(discrepancyValue)}`
+          : discrepancyValue < 0
+          ? `-LKR ${formatAmount(Math.abs(discrepancyValue))}`
           : "No discrepancy";
       showToast(
         "success",
@@ -101,7 +101,7 @@ export function CloseRegistryModal({ isOpen, onClose, registry }: CloseRegistryM
             className="form-input bg-[var(--color-surface-2)] cursor-not-allowed tabular-nums font-medium"
             style={{ color: "var(--color-text)" }}
           >
-            LKR {systemBalance.toFixed(2)}
+            LKR {formatAmount(systemBalance)}
           </div>
           <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
             This is the system&apos;s calculated closing balance.
@@ -132,9 +132,9 @@ export function CloseRegistryModal({ isOpen, onClose, registry }: CloseRegistryM
             )}
           >
             {discrepancy > 0
-              ? `+LKR ${discrepancy.toFixed(2)}`
+              ? `+LKR ${formatAmount(discrepancy)}`
               : discrepancy < 0
-              ? `-LKR ${Math.abs(discrepancy).toFixed(2)}`
+              ? `-LKR ${formatAmount(Math.abs(discrepancy))}`
               : "LKR 0.00"}
           </div>
           <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>

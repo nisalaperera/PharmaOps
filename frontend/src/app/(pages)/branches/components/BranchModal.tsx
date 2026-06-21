@@ -45,7 +45,7 @@ export function BranchModal({ isOpen, onClose, editingBranch }: BranchModalProps
 
   const { register, handleSubmit, reset, control, setValue, formState: { errors } } = useForm<BranchFormValues>({
     resolver:      zodResolver(branchSchema),
-    defaultValues: { name: "", address: "", phone: "", license_number: "", is_active: true },
+    defaultValues: { name: "", code: "", address: "", phone: "", license_number: "", is_active: true },
   });
 
   const watchedIsActive = useWatch({ control, name: "is_active" });
@@ -56,12 +56,13 @@ export function BranchModal({ isOpen, onClose, editingBranch }: BranchModalProps
         isEditing
           ? {
               name:           editingBranch.name,
+              code:           editingBranch.code,
               address:        editingBranch.address,
               phone:          editingBranch.phone,
               license_number: editingBranch.license_number,
               is_active:      editingBranch.is_active,
             }
-          : { name: "", address: "", phone: "", license_number: "", is_active: true }
+          : { name: "", code: "", address: "", phone: "", license_number: "", is_active: true }
       );
     }
   }, [isOpen, isEditing, editingBranch, reset]);
@@ -118,13 +119,23 @@ export function BranchModal({ isOpen, onClose, editingBranch }: BranchModalProps
       }
     >
       <div className="space-y-4">
-        <Input
-          label="Branch Name"
-          placeholder="e.g. Colombo Main Branch"
-          required
-          error={errors.name?.message}
-          {...register("name")}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Input
+            label="Branch Name"
+            placeholder="e.g. Colombo Main Branch"
+            required
+            error={errors.name?.message}
+            {...register("name")}
+          />
+          <Input
+            label="Branch Code"
+            placeholder="e.g. BR01"
+            required
+            maxLength={10}
+            error={errors.code?.message}
+            {...register("code")}
+          />
+        </div>
 
         <Input
           label="Address"

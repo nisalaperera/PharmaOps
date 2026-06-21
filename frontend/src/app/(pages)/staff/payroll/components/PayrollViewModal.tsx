@@ -3,7 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { DEDUCTION_TYPE_OPTIONS, MONTH_OPTIONS } from "@/lib/constants";
-import { formatDateTime } from "@/lib/utils";
+import { formatAmount, formatDateTime } from "@/lib/utils";
 import type { Payroll } from "@/types";
 
 interface PayrollViewModalProps {
@@ -113,13 +113,13 @@ export function PayrollViewModal({ isOpen, onClose, payroll, branchNameMap }: Pa
                 <tr>
                   <td className="px-4 py-2.5" style={{ color: "var(--color-text-muted)" }}>Basic Salary</td>
                   <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                    {payroll.basic_salary.toFixed(2)}
+                    {formatAmount(payroll.basic_salary)}
                   </td>
                 </tr>
                 <tr className="border-t" style={{ borderColor: "var(--color-border)" }}>
                   <td className="px-4 py-2.5" style={{ color: "var(--color-text-muted)" }}>Overtime Pay</td>
                   <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                    {payroll.overtime_pay.toFixed(2)}
+                    {formatAmount(payroll.overtime_pay)}
                   </td>
                 </tr>
                 <tr
@@ -128,7 +128,7 @@ export function PayrollViewModal({ isOpen, onClose, payroll, branchNameMap }: Pa
                 >
                   <td className="px-4 py-2.5" style={{ color: "var(--color-text)" }}>Gross Salary</td>
                   <td className="px-4 py-2.5 text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                    {payroll.gross_salary.toFixed(2)}
+                    {formatAmount(payroll.gross_salary)}
                   </td>
                 </tr>
 
@@ -138,7 +138,7 @@ export function PayrollViewModal({ isOpen, onClose, payroll, branchNameMap }: Pa
                       − {deductionLabel(d.type)}{d.description ? ` (${d.description})` : ""}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-danger-500">
-                      {d.amount.toFixed(2)}
+                      {formatAmount(d.amount)}
                     </td>
                   </tr>
                 ))}
@@ -149,7 +149,7 @@ export function PayrollViewModal({ isOpen, onClose, payroll, branchNameMap }: Pa
                 >
                   <td className="px-4 py-3 text-base" style={{ color: "var(--color-text)" }}>Net Salary</td>
                   <td className="px-4 py-3 text-right tabular-nums text-base" style={{ color: "var(--color-text)" }}>
-                    {payroll.net_salary.toFixed(2)}
+                    {formatAmount(payroll.net_salary)}
                   </td>
                 </tr>
               </tbody>

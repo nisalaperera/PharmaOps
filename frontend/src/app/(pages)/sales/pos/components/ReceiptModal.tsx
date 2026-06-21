@@ -7,7 +7,7 @@ import { Printer, X } from "lucide-react";
 import { Modal }  from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Badge }  from "@/components/ui/Badge";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import { PAYMENT_METHOD_VARIANT } from "@/lib/badges";
 import APP_CONFIG from "@/lib/config";
 import type { Sale } from "@/types";
@@ -185,13 +185,13 @@ export function ReceiptModal({ sale, onClose }: ReceiptModalProps) {
                     </td>
                     <td className="px-3 py-2 text-center tabular-nums" style={{ color: "var(--color-text)" }}>{item.quantity}</td>
                     <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                      <p>{item.unit_price.toFixed(2)}</p>
+                      <p>{formatAmount(item.unit_price)}</p>
                       {item.discount > 0 && (
-                        <p className="text-xs text-danger-500">-{item.discount.toFixed(2)}</p>
+                        <p className="text-xs text-danger-500">-{formatAmount(item.discount)}</p>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>
-                      {item.total_price.toFixed(2)}
+                      {formatAmount(item.total_price)}
                     </td>
                   </tr>
                 ))}
@@ -204,27 +204,27 @@ export function ReceiptModal({ sale, onClose }: ReceiptModalProps) {
         <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ background: "var(--color-surface-2)" }}>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--color-text-muted)" }}>Subtotal</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{sale.subtotal.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(sale.subtotal)}</span>
           </div>
           {sale.discount_total > 0 && (
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Discount</span>
-              <span className="tabular-nums text-danger-500">-{sale.discount_total.toFixed(2)}</span>
+              <span className="tabular-nums text-danger-500">-{formatAmount(sale.discount_total)}</span>
             </div>
           )}
           <div className="h-px" style={{ background: "var(--color-border)" }} />
           <div className="flex justify-between font-bold">
             <span style={{ color: "var(--color-text)" }}>Total</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{sale.total_amount.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(sale.total_amount)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--color-text-muted)" }}>Paid</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{sale.paid_amount.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(sale.paid_amount)}</span>
           </div>
           {sale.payment_method === "CASH" && sale.change_amount > 0 && (
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Change</span>
-              <span className="tabular-nums font-semibold" style={{ color: "#10b981" }}>{sale.change_amount.toFixed(2)}</span>
+              <span className="tabular-nums font-semibold" style={{ color: "#10b981" }}>{formatAmount(sale.change_amount)}</span>
             </div>
           )}
           {sale.cheque_details && (

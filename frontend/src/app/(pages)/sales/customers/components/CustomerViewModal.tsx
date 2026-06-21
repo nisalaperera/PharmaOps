@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Badge }  from "@/components/ui/Badge";
 import { X, Pencil } from "lucide-react";
 import { apiGet } from "@/lib/api-client";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import { getActiveStatusVariant } from "@/lib/badges";
 import type { Customer, CustomerLedger } from "@/types";
 
@@ -72,8 +72,8 @@ export function CustomerViewModal({ customer, isOpen, onClose, onEdit }: Custome
         <div className="grid grid-cols-2 gap-x-6 gap-y-4">
           <Field label="Email"         value={customer.email} />
           <Field label="Date of Birth" value={customer.date_of_birth} />
-          <Field label="Credit Limit"  value={customer.credit_limit.toFixed(2)} />
-          <Field label="Outstanding"   value={customer.outstanding_balance.toFixed(2)} />
+          <Field label="Credit Limit"  value={formatAmount(customer.credit_limit)} />
+          <Field label="Outstanding"   value={formatAmount(customer.outstanding_balance)} />
           {customer.address && <div className="col-span-2"><Field label="Address" value={customer.address} /></div>}
         </div>
 
@@ -102,7 +102,7 @@ export function CustomerViewModal({ customer, isOpen, onClose, onEdit }: Custome
                     className="text-sm font-semibold tabular-nums ml-4"
                     style={{ color: entry.entry_type === "PAYMENT" ? "var(--color-success, #059669)" : "var(--color-text)" }}
                   >
-                    {entry.entry_type === "PAYMENT" ? "-" : "+"}{entry.amount.toFixed(2)}
+                    {entry.entry_type === "PAYMENT" ? "-" : "+"}{formatAmount(entry.amount)}
                   </span>
                 </div>
               ))}

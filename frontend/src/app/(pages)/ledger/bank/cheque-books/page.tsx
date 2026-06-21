@@ -1,26 +1,94 @@
 "use client";
 
-import { useState }                  from "react";
+import { useState, useCallback }     from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   BookOpen, Plus, Pencil, Eye, CheckCircle, Trash2, SlidersHorizontal,
+  FileDown, FileText,
 } from "lucide-react";
-import { DataTable, type Column }    from "@/components/common/DataTable";
-import { Pagination }                from "@/components/common/Pagination";
-import { SearchBar }                 from "@/components/common/SearchBar";
-import { FilterBar }                 from "@/components/common/FilterBar";
-import { Button }                    from "@/components/ui/Button";
-import { Badge }                     from "@/components/ui/Badge";
-import { ConfirmModal }              from "@/components/ui/ConfirmModal";
-import { useAuth }                   from "@/hooks/useAuth";
-import { usePagination }             from "@/hooks/usePagination";
-import { apiGet, apiPatch }          from "@/lib/api-client";
-import { showToast }                 from "@/lib/toast";
-import { ACTIVE_STATUS_OPTIONS }     from "@/lib/constants";
-import { getActiveStatusVariant }    from "@/lib/badges";
-import { ChequeBookModal }           from "./components/ChequeBookModal";
-import { ChequeBookViewModal }       from "./components/ChequeBookViewModal";
+import { format }                     from "date-fns";
+import jsPDF                          from "jspdf";
+import autoTable                      from "jspdf-autotable";
+import APP_CONFIG                     from "@/lib/config";
+import { DataTable, type Column }     from "@/components/common/DataTable";
+import { Pagination }                 from "@/components/common/Pagination";
+import { SearchBar }                  from "@/components/common/SearchBar";
+import { FilterBar }                  from "@/components/common/FilterBar";
+import { Button }                     from "@/components/ui/Button";
+import { Badge }                      from "@/components/ui/Badge";
+import { ConfirmModal }               from "@/components/ui/ConfirmModal";
+import { useAuth }                    from "@/hooks/useAuth";
+import { usePagination }              from "@/hooks/usePagination";
+import { apiGet, apiPatch, downloadBlob } from "@/lib/api-client";
+import { showToast }                  from "@/lib/toast";
+import { ACTIVE_STATUS_OPTIONS }      from "@/lib/constants";
+import { getActiveStatusVariant }     from "@/lib/badges";
+import { ChequeBookModal }            from "./components/ChequeBookModal";
+import { ChequeBookViewModal }        from "./components/ChequeBookViewModal";
 import type { BankAccount, ChequeBook, PaginatedResponse } from "@/types";
+
+// ─── Export helpers ───────────────────────────────────────────────────────────
+
+function exportDateStamp(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function buildRow(book: ChequeBook): string[] {
+  return [
+    book.series_name,
+    `#${book.start_number} - #${book.end_number}`,
+    book.bank_account_name,
+    book.bank_name,
+    book.branch_name,
+    `${book.used_leaves} / ${book.total_leaves}`,
+    book.is_active ? "Active" : "Inactive",
+  ];
+}
+
+function exportSelectedCsv(selected: ChequeBook[]) {
+  const header  = ["Series Name", "Range", "Bank Account", "Bank", "Branch", "Leaves Used", "Status"];
+  const rows    = selected.map(buildRow);
+  const csvText = [header, ...rows]
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(blob, `cheque_books_${exportDateStamp()}.csv`);
+}
+
+async function exportSelectedPdf(selected: ChequeBook[]) {
+  const doc  = new jsPDF();
+  const head = [["Series Name", "Range", "Bank Account", "Bank", "Branch", "Leaves Used", "Status"]];
+  const body = selected.map(buildRow);
+
+  let cursorY = 14;
+  try {
+    const res     = await fetch(APP_CONFIG.orgLogo);
+    const blob    = await res.blob();
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
+    cursorY += 1;
+  } catch {
+    // Logo load failure is non-fatal
+  }
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text(APP_CONFIG.orgName, 28, cursorY + 6);
+  cursorY += 10;
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Cheque Books Report — " + exportDateStamp(), 14, cursorY + 4);
+  cursorY += 10;
+
+  autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
+
+  doc.save(`cheque_books_${exportDateStamp()}.pdf`);
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -40,6 +108,12 @@ export default function ChequeBooksPage() {
   const [editingBook,    setEditingBook]     = useState<ChequeBook | null>(null);
   const [viewingBook,    setViewingBook]     = useState<ChequeBook | null>(null);
   const [confirmToggle,  setConfirmToggle]   = useState<ChequeBook | null>(null);
+
+  // ── Row selection ────────────────────────────────────────────────────────────
+
+  const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
+  const [allPagesSelected, setAllPagesSelected] = useState(false);
+  const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
   // ── Pagination ───────────────────────────────────────────────────────────────
 
@@ -108,6 +182,50 @@ export default function ChequeBooksPage() {
       showToast("error", "Status Update Failed", err?.message ?? "Something went wrong. Please try again.");
     },
   });
+
+  // ── Selection helpers ─────────────────────────────────────────────────────────
+
+  const handleSelectionChange = useCallback((keys: Set<string>) => {
+    setSelectedKeys(keys);
+    setAllPagesSelected(false);
+  }, []);
+
+  const currentPageKeys     = books.map((b) => b.id);
+  const allOnPageSelected   = currentPageKeys.length > 0 && currentPageKeys.every((k) => selectedKeys.has(k));
+  const showSelectAllBanner = allOnPageSelected && !allPagesSelected && totalItems > pagination.pageSize;
+
+  function handleSelectAllPages() { setAllPagesSelected(true); }
+  function clearSelection() { setSelectedKeys(new Set()); setAllPagesSelected(false); }
+
+  const selectedItems  = books.filter((b) => selectedKeys.has(b.id));
+  const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
+
+  // ── Export handlers ───────────────────────────────────────────────────────────
+
+  async function handleExportCsv() {
+    if (allPagesSelected) {
+      setIsExportingCsv(true);
+      try {
+        const allData = await apiGet<PaginatedResponse<ChequeBook>>("/treasury/bank-accounts/cheques/books", {
+          ...queryParams,
+          ...filters,
+          page: 1,
+          page_size: totalItems,
+        });
+        exportSelectedCsv(allData.data);
+      } catch {
+        showToast("error", "Export Failed", "Could not export cheque books. Please try again.");
+      } finally {
+        setIsExportingCsv(false);
+      }
+    } else {
+      exportSelectedCsv(selectedItems);
+    }
+  }
+
+  async function handleExportPdf() {
+    await exportSelectedPdf(selectedItems);
+  }
 
   // ── Column definitions ───────────────────────────────────────────────────────
 
@@ -321,6 +439,38 @@ export default function ChequeBooksPage() {
 
       {/* ── Table card ────────────────────────────────────────────────────────── */}
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
+
+        {/* Select-all-pages banner */}
+        {showSelectAllBanner && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span style={{ color: "var(--color-text-muted)" }}>
+              {pagination.pageSize} records on this page are selected.{" "}
+            </span>
+            <button
+              onClick={handleSelectAllPages}
+              className="font-semibold text-primary-500 hover:underline"
+            >
+              Select all {totalItems} records
+            </button>
+          </div>
+        )}
+
+        {allPagesSelected && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span className="font-semibold text-primary-500">All {totalItems} records selected.</span>
+            {" "}
+            <button onClick={clearSelection} className="hover:underline" style={{ color: "var(--color-text-muted)" }}>
+              Clear selection
+            </button>
+          </div>
+        )}
+
         <DataTable<ChequeBook>
           columns={columns}
           data={books}
@@ -330,6 +480,9 @@ export default function ChequeBooksPage() {
           sort={sort}
           onSort={handleSort}
           emptyMessage={search ? `No cheque books found matching "${search}"` : "No cheque books found."}
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={handleSelectionChange}
         />
 
         {/* Pagination */}
@@ -346,6 +499,46 @@ export default function ChequeBooksPage() {
             />
           )}
         </div>
+
+        {/* Export footer — visible only when rows are selected */}
+        {(selectedKeys.size > 0 || allPagesSelected) && (
+          <div
+            className="border-t flex items-center justify-between px-4 py-3 gap-3"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
+          >
+            <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<FileDown className="w-3.5 h-3.5" />}
+                onClick={handleExportCsv}
+                isLoading={isExportingCsv}
+              >
+                Export CSV
+              </Button>
+              {!allPagesSelected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FileText className="w-3.5 h-3.5" />}
+                  onClick={handleExportPdf}
+                >
+                  Export PDF
+                </Button>
+              )}
+              <button
+                onClick={clearSelection}
+                className="text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Modals ────────────────────────────────────────────────────────────── */}

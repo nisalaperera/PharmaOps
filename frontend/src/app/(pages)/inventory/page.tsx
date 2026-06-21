@@ -13,9 +13,11 @@ import { FilterBar }                                            from "@/componen
 import { Button }                                               from "@/components/ui/Button";
 import { Badge }                                                from "@/components/ui/Badge";
 import { useAuth }                                              from "@/hooks/useAuth";
+import { useBranch }                                            from "@/hooks/useBranch";
 import { usePagination }                                        from "@/hooks/usePagination";
 import { apiGet, apiDownloadFile, downloadBlob }                from "@/lib/api-client";
 import { showToast }                                            from "@/lib/toast";
+import { formatQuantity }                                       from "@/lib/utils";
 import { LOW_STOCK_FILTER_OPTIONS }                             from "@/lib/constants";
 import APP_CONFIG                                               from "@/lib/config";
 import { InventoryModal }    from "./components/InventoryModal";
@@ -123,11 +125,11 @@ function getExpiryQty(item: InventoryItem): number {
 
 export default function InventoryPage() {
   const { permissions } = useAuth();
+  const { activeBranchId } = useBranch();
   const canManage       = permissions?.can("BRANCH_MANAGER") ?? false;
 
   // — Filters
   const [lowStockFilter, setLowStockFilter] = useState("");
-  const [branchFilter,   setBranchFilter]   = useState("");
   const [filterVisible,  setFilterVisible]  = useState(false);
 
   // — Modals
@@ -156,16 +158,15 @@ export default function InventoryPage() {
     usePagination({ initialSortField: "product_name" });
 
   const filters = {
-    ...(branchFilter   && { branch_id: branchFilter }),
+    ...(activeBranchId && { branch_id: activeBranchId }),
     ...(lowStockFilter !== "" && { low_stock: lowStockFilter === "true" }),
   };
 
-  const hasActiveFilters  = lowStockFilter !== "" || branchFilter !== "";
-  const activeFilterCount = (lowStockFilter ? 1 : 0) + (branchFilter ? 1 : 0);
+  const hasActiveFilters  = lowStockFilter !== "";
+  const activeFilterCount = (lowStockFilter ? 1 : 0);
 
   function clearFilters() {
     setLowStockFilter("");
-    setBranchFilter("");
     goToPage(1);
   }
 
@@ -195,7 +196,7 @@ export default function InventoryPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  const currentBranchName = branchFilter ? (branchNameMap[branchFilter] ?? undefined) : undefined;
+  const currentBranchName = activeBranchId ? (branchNameMap[activeBranchId] ?? undefined) : undefined;
 
   // ─── Selection ───────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export default function InventoryPage() {
       setIsExportingCsv(true);
       try {
         const exportParams: Record<string, unknown> = {};
-        if (branchFilter)   exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (lowStockFilter) exportParams.low_stock  = lowStockFilter === "true";
         if (search)         exportParams.search     = search;
         const blob = await apiDownloadFile("/inventory/export", exportParams);
@@ -270,7 +271,7 @@ export default function InventoryPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm font-medium tabular-nums" style={{ color: "var(--color-text)" }}>
-          {row.total_quantity.toLocaleString()}
+          {formatQuantity(row.total_quantity)}
         </p>
       ),
     },
@@ -283,7 +284,7 @@ export default function InventoryPage() {
           <div className="flex items-center gap-1">
             <Clock className="w-3 h-3 text-amber-500 flex-shrink-0" />
             <span className="text-sm font-medium tabular-nums text-amber-600 dark:text-amber-400">
-              {expiryQty.toLocaleString()}
+              {formatQuantity(expiryQty)}
             </span>
           </div>
         ) : (
@@ -297,7 +298,7 @@ export default function InventoryPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-          {row.min_stock_level.toLocaleString()}
+          {formatQuantity(row.min_stock_level)}
         </p>
       ),
     },
@@ -426,19 +427,6 @@ export default function InventoryPage() {
         onClear={clearFilters}
         onHide={hideFilters}
       >
-        {permissions?.isOrgLevel && (
-          <select
-            value={branchFilter}
-            onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }}
-            className="form-select w-auto"
-          >
-            <option value="">All Branches</option>
-            {allBranches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
-
         <select
           value={lowStockFilter}
           onChange={(e) => { setLowStockFilter(e.target.value); goToPage(1); }}

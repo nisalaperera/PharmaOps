@@ -18,7 +18,7 @@ import { useAuth }                from "@/hooks/useAuth";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPatch, apiDownloadFile, apiUploadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
-import { formatPhoneNumber }      from "@/lib/utils";
+import { formatPhoneNumber, formatAmount } from "@/lib/utils";
 import { getActiveStatusVariant } from "@/lib/badges";
 import { ACTIVE_STATUS_OPTIONS }  from "@/lib/constants";
 import APP_CONFIG                 from "@/lib/config";
@@ -246,7 +246,7 @@ export default function CustomersPage() {
       sortable: true,
       render:   (c) => (
         <span className="tabular-nums" style={{ color: "var(--color-text)" }}>
-          {c.credit_limit.toFixed(2)}
+          {formatAmount(c.credit_limit)}
         </span>
       ),
     },
@@ -258,7 +258,7 @@ export default function CustomersPage() {
           className={`tabular-nums font-medium ${c.outstanding_balance > 0 ? "text-warning-600" : ""}`}
           style={c.outstanding_balance === 0 ? { color: "var(--color-text-muted)" } : undefined}
         >
-          {c.outstanding_balance.toFixed(2)}
+          {formatAmount(c.outstanding_balance)}
         </span>
       ),
     },

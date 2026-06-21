@@ -43,6 +43,15 @@ async def get_current_user(
             detail="Account is inactive or suspended",
         )
 
+    jwt_branch = payload.get("branch_id")
+    db_branch  = user_doc.get("branch_id")
+    if jwt_branch is not None and jwt_branch != db_branch:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Branch assignment changed. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return doc_to_dict(user_doc)
 
 

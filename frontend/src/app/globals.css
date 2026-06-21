@@ -71,7 +71,7 @@
 
   /* Page container */
   .page-container {
-    @apply p-6 space-y-6 animate-fade-in;
+    @apply p-4 sm:p-5 lg:p-6 space-y-5 lg:space-y-6 animate-fade-in;
   }
 
   /* Section heading */

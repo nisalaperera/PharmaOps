@@ -6,6 +6,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access
 from app.models.pos_machine import (
     PosMachineCreate, PosMachineUpdate, PosMachineResponse,
     PosTransactionCreate, PosTransactionResponse,
@@ -34,6 +35,7 @@ async def list_pos_machines(
 ):
     db    = get_db()
     query: dict = {}
+    apply_branch_filter(query, current_user)
     if bank_account_id:
         query["bank_account_id"] = bank_account_id
     if is_active is not None and is_active != "":
@@ -66,6 +68,7 @@ async def create_pos_machine(
     account_doc = db[Collections.BANK_ACCOUNTS].find_one({"_id": payload.bank_account_id})
     if not account_doc:
         raise HTTPException(status_code=404, detail="Bank account not found")
+    ensure_branch_access(doc_to_dict(account_doc), current_user)
     if not account_doc.get("is_active", False):
         raise HTTPException(status_code=400, detail="Bank account is inactive")
 
@@ -110,6 +113,7 @@ async def update_pos_machine(
     doc = db[Collections.POS_MACHINES].find_one({"_id": machine_id})
     if not doc:
         raise HTTPException(status_code=404, detail="POS machine not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = payload.model_dump(exclude_none=True)
     if not updates:
@@ -140,9 +144,11 @@ async def list_pos_transactions(
     is_settled:   str | None = Query(None),
     current_user: dict       = Depends(get_current_user),
 ):
-    db = get_db()
-    if not db[Collections.POS_MACHINES].find_one({"_id": machine_id}):
+    db       = get_db()
+    mach_doc = db[Collections.POS_MACHINES].find_one({"_id": machine_id})
+    if not mach_doc:
         raise HTTPException(status_code=404, detail="POS machine not found")
+    ensure_branch_access(doc_to_dict(mach_doc), current_user)
 
     query: dict = {"pos_machine_id": machine_id}
     if is_settled is not None and is_settled != "":
@@ -174,6 +180,7 @@ async def add_pos_transaction(
     machine_doc = db[Collections.POS_MACHINES].find_one({"_id": machine_id})
     if not machine_doc:
         raise HTTPException(status_code=404, detail="POS machine not found")
+    ensure_branch_access(doc_to_dict(machine_doc), current_user)
     if not machine_doc.get("is_active", False):
         raise HTTPException(status_code=400, detail="POS machine is inactive")
 
@@ -216,9 +223,11 @@ async def list_pos_settlements(
     page_size:    int  = Query(20, ge=1, le=100),
     current_user: dict = Depends(get_current_user),
 ):
-    db = get_db()
-    if not db[Collections.POS_MACHINES].find_one({"_id": machine_id}):
+    db       = get_db()
+    mach_doc = db[Collections.POS_MACHINES].find_one({"_id": machine_id})
+    if not mach_doc:
         raise HTTPException(status_code=404, detail="POS machine not found")
+    ensure_branch_access(doc_to_dict(mach_doc), current_user)
 
     query  = {"pos_machine_id": machine_id}
     total  = db[Collections.POS_SETTLEMENTS].count_documents(query)
@@ -249,6 +258,7 @@ async def settle_pos_machine(
     machine_doc = db[Collections.POS_MACHINES].find_one({"_id": machine_id})
     if not machine_doc:
         raise HTTPException(status_code=404, detail="POS machine not found")
+    ensure_branch_access(doc_to_dict(machine_doc), current_user)
     if not machine_doc.get("is_active", False):
         raise HTTPException(status_code=400, detail="Cannot settle an inactive POS machine")
 

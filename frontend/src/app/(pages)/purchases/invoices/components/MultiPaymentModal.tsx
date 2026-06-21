@@ -9,8 +9,9 @@ import { CreditCard } from "lucide-react";
 import { Modal }  from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input }  from "@/components/ui/Input";
-import { apiPost }   from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import { PURCHASE_PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
 import { purchasePaymentSchema, type PurchasePaymentValues } from "../schemas";
 import type { PurchaseInvoice } from "@/types";
@@ -19,10 +20,6 @@ interface MultiPaymentModalProps {
   isOpen:   boolean;
   onClose:  () => void;
   invoices: PurchaseInvoice[];
-}
-
-function lkr(n: number): string {
-  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function MultiPaymentModal({ isOpen, onClose, invoices }: MultiPaymentModalProps) {
@@ -120,8 +117,8 @@ export function MultiPaymentModal({ isOpen, onClose, invoices }: MultiPaymentMod
                     <tr key={field.rhfKey} className="border-t" style={{ borderColor: "var(--color-border)" }}>
                       <td className="px-3 py-2 font-mono" style={{ color: "var(--color-text)" }}>{inv.invoice_number}</td>
                       <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>{inv.supplier_name}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{lkr(inv.net_amount)}</td>
-                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{lkr(outstanding)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(inv.net_amount)}</td>
+                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{formatAmount(outstanding)}</td>
                       <td className="px-3 py-2">
                         <Input
                           type="number" min={0} max={outstanding} step="0.01"
@@ -137,7 +134,7 @@ export function MultiPaymentModal({ isOpen, onClose, invoices }: MultiPaymentMod
               <tfoot>
                 <tr className="border-t" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
                   <td colSpan={4} className="px-3 py-2 text-right font-semibold" style={{ color: "var(--color-text-muted)" }}>Total Payment</td>
-                  <td className="px-3 py-2 tabular-nums font-bold" style={{ color: "var(--color-text)" }}>{lkr(totalToPay)}</td>
+                  <td className="px-3 py-2 tabular-nums font-bold" style={{ color: "var(--color-text)" }}>{formatAmount(totalToPay)}</td>
                 </tr>
               </tfoot>
             </table>

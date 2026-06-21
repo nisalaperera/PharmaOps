@@ -4,20 +4,13 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict
 from app.middleware.auth_middleware import get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields
+from app.utils.branch_scope import apply_branch_filter, enforce_branch_on_create
 from app.models.billing import CreditPaymentCreate, CreditPaymentResponse
 from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/billing", tags=["Billing"])
 
 BILLING_SORT_FIELDS = {"created_at", "amount", "customer_name"}
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
-
-def _apply_branch_scope(flt: dict, current_user: dict, branch_id: str | None) -> None:
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        flt["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        flt["branch_id"] = branch_id
 
 
 @router.get("/payments", response_model=PaginatedResponse[CreditPaymentResponse])
@@ -32,7 +25,7 @@ async def list_credit_payments(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if customer_id:
         flt["customer_id"] = customer_id
 
@@ -88,9 +81,12 @@ async def record_credit_payment(
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
 
+    branch_id = enforce_branch_on_create(payload.branch_id, current_user)
+
     payment_data = {
         "_id":          doc_id,
         **payload.model_dump(),
+        "branch_id":    branch_id,
         "customer_name": customer.get("full_name", ""),
         "cashier_id":   current_user["id"],
         "cashier_name": current_user.get("full_name", ""),

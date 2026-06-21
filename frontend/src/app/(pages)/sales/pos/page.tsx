@@ -11,6 +11,7 @@ import { Input }   from "@/components/ui/Input";
 import { useAuth } from "@/hooks/useAuth";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { showToast }        from "@/lib/toast";
+import { formatAmount }     from "@/lib/utils";
 import { ReceiptModal } from "@/app/(pages)/sales/pos/components/ReceiptModal";
 import type {
   InventoryItem, Customer, Patient, Prescription, Sale, SalesOrder,
@@ -301,7 +302,7 @@ export default function PosPage() {
       return;
     }
     if (paymentMethod === "CASH" && paidNum < total) {
-      showToast("error", "Insufficient Payment", `Paid amount must be at least ${total.toFixed(2)}.`);
+      showToast("error", "Insufficient Payment", `Paid amount must be at least ${formatAmount(total)}.`);
       return;
     }
     if (paymentMethod === "CHEQUE" && (!chequeNumber || !bankName || !clearanceDate)) {
@@ -311,7 +312,7 @@ export default function PosPage() {
     if (paymentMethod === "CREDIT" && selectedCustomer) {
       const available = selectedCustomer.credit_limit - selectedCustomer.outstanding_balance;
       if (total > available) {
-        showToast("error", "Credit Limit Exceeded", `Available credit: ${available.toFixed(2)}`);
+        showToast("error", "Credit Limit Exceeded", `Available credit: ${formatAmount(available)}`);
         return;
       }
     }
@@ -490,7 +491,7 @@ export default function PosPage() {
                     </div>
                     <div className="text-right ml-4 flex-shrink-0">
                       <p className="text-sm font-bold tabular-nums" style={{ color: "var(--color-text)" }}>
-                        {batch?.selling_price.toFixed(2)}
+                        {formatAmount(batch?.selling_price ?? 0)}
                       </p>
                       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>per unit</p>
                     </div>
@@ -595,7 +596,7 @@ export default function PosPage() {
 
                   {/* Unit price */}
                   <p className="text-sm text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                    {item.unitPrice.toFixed(2)}
+                    {formatAmount(item.unitPrice)}
                   </p>
 
                   {/* Discount */}
@@ -615,7 +616,7 @@ export default function PosPage() {
 
                   {/* Line total */}
                   <p className="text-sm font-semibold text-right tabular-nums" style={{ color: "var(--color-text)" }}>
-                    {lineTotal(item).toFixed(2)}
+                    {formatAmount(lineTotal(item))}
                   </p>
 
                   {/* Remove */}
@@ -758,18 +759,18 @@ export default function PosPage() {
                 </div>
               )}
               <p style={{ color: "var(--color-text-muted)" }}>
-                Limit: <strong style={{ color: "var(--color-text)" }}>{selectedCustomer.credit_limit.toFixed(2)}</strong>
+                Limit: <strong style={{ color: "var(--color-text)" }}>{formatAmount(selectedCustomer.credit_limit)}</strong>
               </p>
               <p style={{ color: "var(--color-text-muted)" }}>
                 Outstanding:{" "}
                 <strong style={{ color: selectedCustomer.outstanding_balance > 0 ? "#ef4444" : "var(--color-text)" }}>
-                  {selectedCustomer.outstanding_balance.toFixed(2)}
+                  {formatAmount(selectedCustomer.outstanding_balance)}
                 </strong>
               </p>
               <p style={{ color: "var(--color-text-muted)" }}>
                 Available:{" "}
                 <strong style={{ color: creditOk ? "#10b981" : "#ef4444" }}>
-                  {(creditRemaining ?? 0).toFixed(2)}
+                  {formatAmount(creditRemaining ?? 0)}
                 </strong>
               </p>
             </div>
@@ -784,18 +785,18 @@ export default function PosPage() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Subtotal</span>
-              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{subtotal.toFixed(2)}</span>
+              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(subtotal)}</span>
             </div>
             {discountTotal > 0 && (
               <div className="flex justify-between text-sm">
                 <span style={{ color: "var(--color-text-muted)" }}>Discount</span>
-                <span className="tabular-nums text-danger-500">-{discountTotal.toFixed(2)}</span>
+                <span className="tabular-nums text-danger-500">-{formatAmount(discountTotal)}</span>
               </div>
             )}
             <div className="h-px my-1" style={{ background: "var(--color-border)" }} />
             <div className="flex justify-between font-bold text-base">
               <span style={{ color: "var(--color-text)" }}>Total</span>
-              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{total.toFixed(2)}</span>
+              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(total)}</span>
             </div>
           </div>
         </div>
@@ -877,7 +878,7 @@ export default function PosPage() {
               step={0.01}
               value={paidAmount}
               onChange={(e) => setPaidAmount(e.target.value)}
-              placeholder={total.toFixed(2)}
+              placeholder={formatAmount(total)}
               className="form-input w-full text-base font-semibold tabular-nums"
             />
             <div className="flex justify-between text-sm mt-2">
@@ -886,7 +887,7 @@ export default function PosPage() {
                 className="font-bold tabular-nums"
                 style={{ color: change > 0 ? "#10b981" : "var(--color-text)" }}
               >
-                {change.toFixed(2)}
+                {formatAmount(change)}
               </span>
             </div>
           </div>
@@ -903,7 +904,7 @@ export default function PosPage() {
               isLoading={isPending}
               disabled={cart.length === 0 || !effectiveBranchId}
             >
-              Complete Sale · {total.toFixed(2)}
+              Complete Sale · {formatAmount(total)}
             </Button>
           ) : (
             <Button
@@ -915,7 +916,7 @@ export default function PosPage() {
               disabled={cart.length === 0 || !effectiveBranchId}
               leftIcon={<ClipboardList className="w-4 h-4" />}
             >
-              Save Order · {total.toFixed(2)}
+              Save Order · {formatAmount(total)}
             </Button>
           )}
 

@@ -31,6 +31,7 @@ class SalesOrderUpdate(BaseModel):
 
 class SalesOrderResponse(SalesOrderCreate, TimestampMixin):
     id:             str
+    order_number:   str = ""
     customer_name:  str = ""
     subtotal:       float = 0
     discount_total: float = 0

@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { PO_STATUS_LABEL, PO_STATUS_VARIANT } from "@/lib/badges";
+import { formatAmount } from "@/lib/utils";
 import type { PurchaseOrder } from "@/types";
 
 interface POViewModalProps {
@@ -66,7 +67,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Order Total</dt>
             <dd className="text-sm font-bold tabular-nums mt-1" style={{ color: "var(--color-text)" }}>
-              LKR {po.total_amount.toFixed(2)}
+              LKR {formatAmount(po.total_amount)}
             </dd>
           </div>
 
@@ -74,7 +75,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
             <div>
               <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Return Amount</dt>
               <dd className="text-sm font-bold tabular-nums mt-1" style={{ color: "var(--color-danger)" }}>
-                LKR {po.return_amount.toFixed(2)}
+                LKR {formatAmount(po.return_amount)}
               </dd>
             </div>
           )}
@@ -124,9 +125,9 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                     <td className="px-3 py-2 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku || "—"}</td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.unit_quantity}</td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.free_quantity ?? 0}</td>
-                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{(item.discount ?? 0).toFixed(2)}</td>
-                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.unit_price.toFixed(2)}</td>
-                    <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{(item.line_total ?? 0).toFixed(2)}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.discount ?? 0)}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.unit_price)}</td>
+                    <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{formatAmount(item.line_total ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -134,7 +135,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                 <tr className="border-t" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
                   <td colSpan={6} className="px-3 py-2 text-right text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Order Total</td>
                   <td className="px-3 py-2 tabular-nums font-bold text-sm" style={{ color: "var(--color-text)" }}>
-                    {po.total_amount.toFixed(2)}
+                    {formatAmount(po.total_amount)}
                   </td>
                 </tr>
               </tfoot>
@@ -164,8 +165,8 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                       <td className="px-3 py-2 font-mono text-xs" style={{ color: "var(--color-text-muted)" }}>{item.sku || "—"}</td>
                       <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.unit_quantity}</td>
                       <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.free_quantity ?? 0}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.unit_price.toFixed(2)}</td>
-                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-danger)" }}>{(item.line_total ?? 0).toFixed(2)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.unit_price)}</td>
+                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-danger)" }}>{formatAmount(item.line_total ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -173,7 +174,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                   <tr className="border-t" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
                     <td colSpan={5} className="px-3 py-2 text-right text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Return Total</td>
                     <td className="px-3 py-2 tabular-nums font-bold text-sm" style={{ color: "var(--color-danger)" }}>
-                      {po.return_amount.toFixed(2)}
+                      {formatAmount(po.return_amount)}
                     </td>
                   </tr>
                 </tfoot>

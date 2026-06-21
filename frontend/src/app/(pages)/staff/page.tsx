@@ -18,6 +18,7 @@ import { StatusBadge }            from "@/components/ui/StatusBadge";
 import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { ImportModal }            from "@/components/common/ImportModal";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPatch, apiDownloadFile, apiUploadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
@@ -118,11 +119,11 @@ async function exportSelectedPdf(
 
 export default function StaffPage() {
   const { permissions } = useAuth();
+  const { activeBranchId } = useBranch();
   const canManage = permissions?.isAdmin || permissions?.isManager || permissions?.isBranchAdmin;
 
   // — Filters
   const [statusFilter,  setStatusFilter]  = useState("");
-  const [branchFilter,  setBranchFilter]  = useState("");
   const [filterVisible, setFilterVisible] = useState(false);
 
   // — Modals
@@ -141,15 +142,15 @@ export default function StaffPage() {
     usePagination({ initialSortField: "epf_no" });
 
   const filters = {
-    ...(statusFilter && { is_active: statusFilter }),
-    ...(branchFilter && { branch_id: branchFilter }),
+    ...(statusFilter    && { is_active: statusFilter }),
+    ...(activeBranchId  && { branch_id: activeBranchId }),
   };
 
-  const hasActiveFilters  = statusFilter !== "" || branchFilter !== "";
-  const activeFilterCount = (statusFilter ? 1 : 0) + (branchFilter ? 1 : 0);
+  const hasActiveFilters  = statusFilter !== "";
+  const activeFilterCount = (statusFilter ? 1 : 0);
 
   function clearFilters() {
-    setStatusFilter(""); setBranchFilter("");
+    setStatusFilter("");
     goToPage(1);
   }
 
@@ -181,7 +182,7 @@ export default function StaffPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  const currentBranchName = branchFilter ? (branchNameMap[branchFilter] ?? undefined) : undefined;
+  const currentBranchName = activeBranchId ? (branchNameMap[activeBranchId] ?? undefined) : undefined;
 
   // ─── Toggle status ────────────────────────────────────────────────────────────
 
@@ -229,7 +230,7 @@ export default function StaffPage() {
       try {
         const exportParams: Record<string, unknown> = {};
         if (statusFilter) exportParams.is_active = statusFilter;
-        if (branchFilter) exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (search)       exportParams.search    = search;
         const blob = await apiDownloadFile("/staff/export", exportParams);
         const branchSlug = currentBranchName ? `_${currentBranchName.toLowerCase().replace(/\s+/g, "_")}` : "";
@@ -443,19 +444,6 @@ export default function StaffPage() {
 
       {/* ── Filter bar ─────────────────────────────────────────────────────── */}
       <FilterBar isVisible={filterVisible} hasActiveFilters={hasActiveFilters} onClear={clearFilters} onHide={hideFilters}>
-        {permissions?.isOrgLevel && allBranches.length > 0 && (
-          <select
-            value={branchFilter}
-            onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }}
-            className="form-select w-auto"
-          >
-            <option value="">All Branches</option>
-            {allBranches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
-
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); goToPage(1); }}

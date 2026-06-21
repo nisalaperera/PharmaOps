@@ -17,9 +17,11 @@ import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
 import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPost, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
+import { formatAmount }           from "@/lib/utils";
 import { PO_STATUS_FILTER_OPTIONS } from "@/lib/constants";
 import { PO_STATUS_LABEL, PO_STATUS_VARIANT } from "@/lib/badges";
 import APP_CONFIG                 from "@/lib/config";
@@ -137,9 +139,10 @@ export default function PurchaseOrdersPage() {
   const canManage   = permissions?.can("BRANCH_USER")    ?? false;
   const canApprove  = permissions?.can("BRANCH_MANAGER") ?? false;
 
+  const { activeBranchId } = useBranch();
+
   // — Filters
   const [statusFilter, setStatusFilter]  = useState("");
-  const [branchFilter, setBranchFilter]  = useState("");
   const [filterVisible, setFilterVisible] = useState(false);
 
   // — Modal state
@@ -159,15 +162,15 @@ export default function PurchaseOrdersPage() {
 
   // — Filters object
   const filters = {
-    ...(statusFilter && { status:    statusFilter }),
-    ...(branchFilter && { branch_id: branchFilter }),
+    ...(statusFilter    && { status:    statusFilter }),
+    ...(activeBranchId  && { branch_id: activeBranchId }),
   };
 
-  const hasActiveFilters  = statusFilter !== "" || branchFilter !== "";
-  const activeFilterCount = (statusFilter ? 1 : 0) + (branchFilter ? 1 : 0);
+  const hasActiveFilters  = statusFilter !== "";
+  const activeFilterCount = (statusFilter ? 1 : 0);
 
   function clearFilters() {
-    setStatusFilter(""); setBranchFilter("");
+    setStatusFilter("");
     goToPage(1);
   }
 
@@ -239,7 +242,7 @@ export default function PurchaseOrdersPage() {
       try {
         const exportParams: Record<string, unknown> = {};
         if (statusFilter) exportParams.status    = statusFilter;
-        if (branchFilter) exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (search)       exportParams.search    = search;
         const blob = await apiDownloadFile("/purchase-orders/export", exportParams);
         downloadBlob(blob, `purchase_orders_${exportDateStamp()}.csv`);
@@ -300,7 +303,7 @@ export default function PurchaseOrdersPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          {row.total_amount.toFixed(2)}
+          {formatAmount(row.total_amount)}
         </span>
       ),
     },
@@ -457,18 +460,6 @@ export default function PurchaseOrdersPage() {
           ))}
         </select>
 
-        {permissions?.isOrgLevel && (
-          <select
-            value={branchFilter}
-            onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }}
-            className="form-select w-auto"
-          >
-            <option value="">All Branches</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
       </FilterBar>
 
       {/* ── Table card ────────────────────────────────────────────────────── */}

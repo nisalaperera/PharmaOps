@@ -12,10 +12,17 @@ from app.utils.rate_limit import is_rate_limited, record_failed_attempt, clear_a
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
-def create_access_token(user_id: str) -> str:
+def create_access_token(
+    user_id: str, role: str, branch_id: str | None = None
+) -> str:
     settings = get_settings()
     expire   = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiry_hours)
-    payload  = {"sub": user_id, "exp": expire}
+    payload  = {
+        "sub":       user_id,
+        "role":      role,
+        "branch_id": branch_id,
+        "exp":       expire,
+    }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
 
 
@@ -70,7 +77,11 @@ async def login(request: LoginRequest, http_request: Request):
     )
 
     user_id = str(user_doc["_id"])
-    token   = create_access_token(user_id)
+    token   = create_access_token(
+        user_id,
+        role=user_doc["role"],
+        branch_id=user_doc.get("branch_id"),
+    )
 
     return TokenResponse(
         access_token=token,

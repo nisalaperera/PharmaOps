@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from app.core.database import get_db, Collections, new_id, doc_to_dict, build_search_filter
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create, effective_branch_id
 from app.models.staff import (
     StaffCreate, StaffUpdate, StaffResponse,
     AttendanceCreate, AttendanceUpdate, AttendanceResponse,
@@ -166,14 +167,7 @@ async def get_staff_by_branch(
 ):
     db = get_db()
 
-    # Branch-level users are scoped to their own branch; ignore the path param.
-    effective_branch = (
-        current_user["branch_id"]
-        if current_user["role"] in ("BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER")
-        else branch_id
-    )
-
-    filter: dict = {"branch_id": effective_branch}
+    filter: dict = {"branch_id": effective_branch_id(current_user, branch_id)}
     if is_active is not None:
         filter["is_active"] = is_active
 
@@ -198,14 +192,7 @@ async def list_staff(
 ):
     db     = get_db()
     filter = {}
-
-    effective_branch = (
-        current_user["branch_id"]
-        if current_user["role"] in ("BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER")
-        else branch_id
-    )
-    if effective_branch:
-        filter["branch_id"] = effective_branch
+    apply_branch_filter(filter, current_user, branch_id)
     if is_active is not None:
         filter["is_active"] = is_active
     if employment_type:
@@ -237,6 +224,7 @@ async def create_staff(
     db     = get_db()
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
     data   = {"_id": doc_id, **payload.model_dump(), "created_at": now, "updated_at": now, **audit_create_fields(current_user)}
     db[Collections.STAFF].insert_one(data)
     return StaffResponse(**doc_to_dict(data))
@@ -248,9 +236,11 @@ async def update_staff(
     payload:      StaffUpdate,
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db = get_db()
-    if not db[Collections.STAFF].find_one({"_id": staff_id}):
+    db  = get_db()
+    doc = db[Collections.STAFF].find_one({"_id": staff_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="Staff member not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     updates.update(audit_update_fields(current_user))
@@ -271,14 +261,7 @@ async def export_staff(
 ):
     db     = get_db()
     filter = {}
-
-    effective_branch = (
-        current_user["branch_id"]
-        if current_user["role"] in ("BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER")
-        else branch_id
-    )
-    if effective_branch:
-        filter["branch_id"] = effective_branch
+    apply_branch_filter(filter, current_user, branch_id)
     if is_active is not None:
         filter["is_active"] = is_active
     if employment_type:

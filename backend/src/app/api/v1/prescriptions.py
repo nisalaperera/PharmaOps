@@ -6,6 +6,8 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.sequences import generate_document_number, get_branch_code
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.models.prescription import (
     PrescriptionCreate, PrescriptionUpdate, PrescriptionResponse,
 )
@@ -14,14 +16,6 @@ from app.models.common import PaginatedResponse
 router = APIRouter(prefix="/prescriptions", tags=["Prescriptions"])
 
 PRESCRIPTION_SORT_FIELDS = {"patient_name", "doctor_name", "prescription_date", "expiry_date", "created_at"}
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
-
-def _apply_branch_scope(flt: dict, current_user: dict, branch_id: str | None) -> None:
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        flt["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        flt["branch_id"] = branch_id
 
 
 # ── Export (must be before /{prescription_id}) ────────────────────────────────
@@ -35,7 +29,7 @@ async def export_prescriptions(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if is_active is not None:
         flt["is_active"] = is_active
     if search:
@@ -81,7 +75,7 @@ async def list_prescriptions(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if patient_id:  flt["patient_id"] = patient_id
     if is_active is not None:
         flt["is_active"] = is_active
@@ -112,6 +106,7 @@ async def create_prescription(
     db     = get_db()
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     patient      = db[Collections.PATIENTS].find_one({"_id": payload.patient_id})
     doctor       = db[Collections.DOCTORS].find_one({"_id": payload.doctor_id})
@@ -124,9 +119,13 @@ async def create_prescription(
         product_name = product.get("name", item.product_name) if product else item.product_name
         items.append({**item.model_dump(), "product_name": product_name})
 
+    branch_code         = get_branch_code(db, payload.branch_id)
+    prescription_number = generate_document_number(db, branch_code, "RX")
+
     data = {
-        "_id":               doc_id,
-        "patient_id":        payload.patient_id,
+        "_id":                  doc_id,
+        "prescription_number":  prescription_number,
+        "patient_id":           payload.patient_id,
         "patient_name":      patient_name,
         "doctor_id":         payload.doctor_id,
         "doctor_name":       doctor_name,
@@ -160,7 +159,9 @@ async def get_prescription(
     doc = db[Collections.PRESCRIPTIONS].find_one({"_id": prescription_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Prescription not found")
-    return PrescriptionResponse(**doc_to_dict(doc))
+    prescription = doc_to_dict(doc)
+    ensure_branch_access(prescription, current_user)
+    return PrescriptionResponse(**prescription)
 
 
 # ── Toggle active ─────────────────────────────────────────────────────────────
@@ -175,6 +176,7 @@ async def update_prescription(
     doc = db[Collections.PRESCRIPTIONS].find_one({"_id": prescription_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Prescription not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()

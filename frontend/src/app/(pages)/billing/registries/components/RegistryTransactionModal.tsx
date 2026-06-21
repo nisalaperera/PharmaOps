@@ -7,8 +7,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal }   from "@/components/ui/Modal";
 import { Button }  from "@/components/ui/Button";
 import { Input }   from "@/components/ui/Input";
-import { apiPost } from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import {
   registryTransactionSchema,
   type RegistryTransactionValues,
@@ -57,7 +58,7 @@ export function RegistryTransactionModal({
     },
     onSuccess: (_, values) => {
       queryClient.invalidateQueries({ queryKey: ["registries"] });
-      const amountLabel = `LKR ${values.amount.toFixed(2)}`;
+      const amountLabel = `LKR ${formatAmount(values.amount)}`;
       if (isDeposit) {
         showToast("success", "Deposit Recorded", `${amountLabel} deposited to ${registry!.name}.`);
       } else {
@@ -106,7 +107,7 @@ export function RegistryTransactionModal({
             className="form-input bg-[var(--color-surface-2)] cursor-not-allowed tabular-nums font-medium"
             style={{ color: "var(--color-text)" }}
           >
-            LKR {registry.current_balance.toFixed(2)}
+            LKR {formatAmount(registry.current_balance)}
           </div>
         </div>
 

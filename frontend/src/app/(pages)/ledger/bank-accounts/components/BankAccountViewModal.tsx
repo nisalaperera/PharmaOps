@@ -4,7 +4,7 @@ import { useQuery }        from "@tanstack/react-query";
 import { Modal }           from "@/components/ui/Modal";
 import { Badge }           from "@/components/ui/Badge";
 import { apiGet }          from "@/lib/api-client";
-import { formatDateTime }  from "@/lib/utils";
+import { formatAmount, formatDateTime } from "@/lib/utils";
 import { getActiveStatusVariant } from "@/lib/badges";
 import type { BankAccount, BankAccountTransaction } from "@/types";
 
@@ -106,7 +106,7 @@ export function BankAccountViewModal({ isOpen, onClose, account }: BankAccountVi
             Current Balance
           </dt>
           <dd className="text-sm mt-0.5 font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-            LKR {account.current_balance.toFixed(2)}
+            LKR {formatAmount(account.current_balance)}
           </dd>
         </div>
 
@@ -189,12 +189,12 @@ export function BankAccountViewModal({ isOpen, onClose, account }: BankAccountVi
                     </td>
                     <td className="text-right">
                       <span className="tabular-nums text-sm font-medium" style={{ color: "var(--color-text)" }}>
-                        LKR {transaction.amount.toFixed(2)}
+                        LKR {formatAmount(transaction.amount)}
                       </span>
                     </td>
                     <td className="text-right">
                       <span className="tabular-nums text-sm" style={{ color: "var(--color-text-muted)" }}>
-                        LKR {transaction.balance_after.toFixed(2)}
+                        LKR {formatAmount(transaction.balance_after)}
                       </span>
                     </td>
                     <td>

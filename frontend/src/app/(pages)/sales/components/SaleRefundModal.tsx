@@ -14,6 +14,7 @@ import { PAYMENT_METHOD_VARIANT }         from "@/lib/badges";
 import { PAYMENT_METHOD_LABEL }           from "@/lib/constants";
 import { saleRefundSchema }               from "../schemas";
 import type { SaleRefundFormValues }      from "../schemas";
+import { formatAmount }                    from "@/lib/utils";
 import type { Sale }                      from "@/types";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -76,7 +77,7 @@ export function SaleRefundModal({ isOpen, onClose, sale }: SaleRefundModalProps)
           </Badge>
         </div>
         <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>
-          {sale.customer_name || "Walk-in"} · Total LKR {sale.total_amount.toFixed(2)}
+          {sale.customer_name || "Walk-in"} · Total LKR {formatAmount(sale.total_amount)}
         </p>
       </div>
 
@@ -89,7 +90,7 @@ export function SaleRefundModal({ isOpen, onClose, sale }: SaleRefundModalProps)
             <div>
               <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>Full Refund</p>
               <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-                Refund the entire sale amount of LKR {sale.total_amount.toFixed(2)}.
+                Refund the entire sale amount of LKR {formatAmount(sale.total_amount)}.
               </p>
             </div>
           </label>

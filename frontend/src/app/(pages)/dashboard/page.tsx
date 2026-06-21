@@ -8,21 +8,33 @@ import { useQuery } from "@tanstack/react-query";
 import { StatCard, Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useBranch } from "@/hooks/useBranch";
 import { apiGet } from "@/lib/api-client";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { PAYMENT_METHOD_VARIANT } from "@/lib/badges";
-import type { DashboardStats } from "@/types";
+import { RevenueTrendChart }      from "./components/RevenueTrendChart";
+import { TopProductsChart }       from "./components/TopProductsChart";
+import { PaymentBreakdownChart }  from "./components/PaymentBreakdownChart";
+import type { DashboardStats, DashboardCharts } from "@/types";
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
   const { user, permissions } = useAuth();
+  const { activeBranchId }    = useBranch();
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey:        ["dashboard-stats"],
+    queryKey:        ["dashboard-stats", activeBranchId],
     queryFn:         () => apiGet<DashboardStats>("/dashboard/stats"),
     enabled:         !!user,
     refetchInterval: 60_000,
+  });
+
+  const { data: charts } = useQuery<DashboardCharts>({
+    queryKey:        ["dashboard-charts", activeBranchId],
+    queryFn:         () => apiGet<DashboardCharts>("/dashboard/charts"),
+    enabled:         !!user,
+    staleTime:       5 * 60 * 1000,
   });
 
   return (
@@ -218,6 +230,19 @@ export default function DashboardPage() {
           </Card>
         )}
       </div>
+
+      {/* Charts */}
+      {charts && (
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <RevenueTrendChart data={charts.revenue_trend} />
+            <PaymentBreakdownChart data={charts.payment_breakdown} />
+          </div>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <TopProductsChart data={charts.top_products} />
+          </div>
+        </>
+      )}
     </div>
   );
 }

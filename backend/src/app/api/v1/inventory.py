@@ -4,15 +4,14 @@ from datetime import datetime, timezone
 import csv, io, re
 from app.core.database import get_db, Collections, doc_to_dict, new_id
 from app.middleware.auth_middleware import get_current_user, require_min_role
+from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create, BRANCH_LEVEL_ROLES
 from app.models.inventory import InventoryResponse, InventoryUpdate, StockInPayload, StockInCreatePayload, StockOutPayload
 from app.models.common import PaginatedResponse, ImportResult, ImportRowError
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 INVENTORY_SORT_FIELDS = {"product_name", "total_quantity", "min_stock_level"}
-
-BRANCH_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
 
 def _build_filter(
     current_user: dict,
@@ -21,12 +20,7 @@ def _build_filter(
     search:       str | None,
 ) -> dict:
     flt: dict = {}
-    effective_branch = (
-        current_user["branch_id"]
-        if current_user["role"] in BRANCH_ROLES
-        else branch_id
-    )
-    if effective_branch:      flt["branch_id"]    = effective_branch
+    apply_branch_filter(flt, current_user, branch_id)
     if low_stock is not None: flt["is_low_stock"] = low_stock
     if search:                flt["product_name"] = {"$regex": re.escape(search), "$options": "i"}
     return flt
@@ -164,7 +158,7 @@ async def import_stock_in(
 
     db       = get_db()
     result   = ImportResult()
-    is_branch_user = current_user["role"] in BRANCH_ROLES
+    is_branch_user = current_user["role"] in BRANCH_LEVEL_ROLES
 
     for row_index, raw_row in enumerate(reader, start=2):
         row = {k.strip().lower(): (v or "").strip() for k, v in raw_row.items()}
@@ -249,6 +243,7 @@ async def import_stock_in(
                 "is_low_stock":    False,
                 "created_at":      now,
                 "updated_at":      now,
+                **audit_create_fields(current_user),
             }
             db[Collections.INVENTORY].insert_one(doc)
 
@@ -271,7 +266,7 @@ async def import_stock_in(
                 "received_date":  datetime.now(timezone.utc).date().isoformat(),
             })
 
-        updates = _recalculate_inventory(doc, batches)
+        updates = _recalculate_inventory(doc, batches, current_user)
         db[Collections.INVENTORY].update_one({"_id": doc["_id"]}, {"$set": updates})
 
         if is_new_inventory:
@@ -293,6 +288,7 @@ async def get_inventory_item(
     doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Inventory record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     return InventoryResponse(**doc_to_dict(doc))
 
 
@@ -304,23 +300,29 @@ async def update_inventory(
     payload:      InventoryUpdate,
     current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
-    db = get_db()
-    if not db[Collections.INVENTORY].find_one({"_id": inventory_id}):
+    db  = get_db()
+    doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="Inventory record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates.update(audit_update_fields(current_user))
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
     updated = db[Collections.INVENTORY].find_one({"_id": inventory_id})
     return InventoryResponse(**doc_to_dict(updated))
 
 
-def _recalculate_inventory(doc: dict, batches: list) -> dict:
+def _recalculate_inventory(doc: dict, batches: list, current_user: dict | None = None) -> dict:
     """Recalculate total_quantity and is_low_stock from updated batches."""
     total_qty   = sum(b["quantity"] for b in batches)
     is_low_stock = total_qty <= doc.get("min_stock_level", 0)
     now         = datetime.now(timezone.utc).isoformat()
-    return {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low_stock, "updated_at": now}
+    result = {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low_stock, "updated_at": now}
+    if current_user:
+        result.update(audit_update_fields(current_user))
+    return result
 
 
 # ── Stock In (create or update inventory record) ──────────────────────────────
@@ -332,9 +334,7 @@ async def stock_in_create(
     current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
     db        = get_db()
-    branch_id = payload.branch_id or current_user.get("branch_id")
-    if not branch_id:
-        raise HTTPException(status_code=400, detail="branch_id is required for org-level users")
+    branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     doc = db[Collections.INVENTORY].find_one({"product_id": payload.product_id, "branch_id": branch_id})
     if not doc:
@@ -351,6 +351,7 @@ async def stock_in_create(
             "is_low_stock":    False,
             "created_at":     now,
             "updated_at":     now,
+            **audit_create_fields(current_user),
         }
         db[Collections.INVENTORY].insert_one(doc)
 
@@ -372,7 +373,7 @@ async def stock_in_create(
             "received_date":  datetime.now(timezone.utc).date().isoformat(),
         })
 
-    updates = _recalculate_inventory(doc, batches)
+    updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))
 
@@ -389,6 +390,7 @@ async def stock_in(
     doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Inventory record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     batches = list(doc.get("batches", []))
 
@@ -408,7 +410,7 @@ async def stock_in(
             "received_date":  datetime.now(timezone.utc).date().isoformat(),
         })
 
-    updates = _recalculate_inventory(doc, batches)
+    updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))
 
@@ -425,6 +427,7 @@ async def stock_out(
     doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Inventory record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     batches = list(doc.get("batches", []))
     batch   = next((b for b in batches if b["batch_number"] == payload.batch_number), None)
@@ -439,6 +442,6 @@ async def stock_out(
     batch["quantity"] -= payload.quantity
     batches = [b for b in batches if b["quantity"] > 0]
 
-    updates = _recalculate_inventory(doc, batches)
+    updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))

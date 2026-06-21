@@ -1,11 +1,15 @@
 "use client";
 
-import { useState }                   from "react";
+import { useState, useCallback }   from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import {
-  Receipt, Eye, SlidersHorizontal, Download,
+  Receipt, Eye, SlidersHorizontal, FileDown, FileText,
 } from "lucide-react";
-import { DataTable, type Column } from "@/components/common/DataTable";
+import { format }                  from "date-fns";
+import jsPDF                       from "jspdf";
+import autoTable                   from "jspdf-autotable";
+import APP_CONFIG                  from "@/lib/config";
+import { DataTable, type Column }  from "@/components/common/DataTable";
 import { Pagination }              from "@/components/common/Pagination";
 import { SearchBar }               from "@/components/common/SearchBar";
 import { FilterBar }               from "@/components/common/FilterBar";
@@ -13,9 +17,9 @@ import { Button }                  from "@/components/ui/Button";
 import { Badge }                   from "@/components/ui/Badge";
 import { useAuth }                 from "@/hooks/useAuth";
 import { usePagination }           from "@/hooks/usePagination";
-import { apiGet, apiDownloadFile } from "@/lib/api-client";
+import { apiGet, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }               from "@/lib/toast";
-import { formatDateTime }          from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import {
   SALE_STATUS_FILTER_OPTIONS, PAYMENT_METHOD_FILTER_OPTIONS,
   PAYMENT_METHOD_LABEL,
@@ -25,12 +29,69 @@ import { SaleViewModal }   from "../components/SaleViewModal";
 import { SaleRefundModal } from "../components/SaleRefundModal";
 import type { Sale, PaginatedResponse } from "@/types";
 
-async function downloadCsvExport(filters: Record<string, string>) {
+// ─── Export helpers ───────────────────────────────────────────────────────────
+
+function exportDateStamp(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function buildRow(sale: Sale): string[] {
+  return [
+    formatDateTime(sale.created_at),
+    `#${sale.id.slice(-8).toUpperCase()}`,
+    sale.customer_name || "Walk-in",
+    sale.cashier_name,
+    sale.source === "ORDER" ? "Order" : "POS",
+    String(sale.items.length),
+    `LKR ${formatAmount(sale.total_amount)}`,
+    PAYMENT_METHOD_LABEL[sale.payment_method] ?? sale.payment_method,
+    sale.status === "PARTIAL_REFUND" ? "Partial Refund" : sale.status === "REFUNDED" ? "Refunded" : "Completed",
+  ];
+}
+
+function exportSelectedCsv(selected: Sale[]) {
+  const header  = ["Date / Time", "Invoice ID", "Customer", "Cashier", "Source", "Items", "Total", "Payment", "Status"];
+  const rows    = selected.map(buildRow);
+  const csvText = [header, ...rows]
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(blob, `sales_invoices_${exportDateStamp()}.csv`);
+}
+
+async function exportSelectedPdf(selected: Sale[]) {
+  const doc  = new jsPDF();
+  const head = [["Date / Time", "Invoice ID", "Customer", "Cashier", "Source", "Items", "Total", "Payment", "Status"]];
+  const body = selected.map(buildRow);
+
+  let cursorY = 14;
   try {
-    await apiDownloadFile("/sales/invoices/export", filters);
+    const res     = await fetch(APP_CONFIG.orgLogo);
+    const blob    = await res.blob();
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
+    cursorY += 1;
   } catch {
-    showToast("error", "Export Failed", "Could not download the sales CSV.");
+    // Logo load failure is non-fatal
   }
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text(APP_CONFIG.orgName, 28, cursorY + 6);
+  cursorY += 10;
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Sales Invoices Report — " + exportDateStamp(), 14, cursorY + 4);
+  cursorY += 10;
+
+  autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 7 } });
+
+  doc.save(`sales_invoices_${exportDateStamp()}.pdf`);
 }
 
 export default function SalesInvoicesPage() {
@@ -45,6 +106,11 @@ export default function SalesInvoicesPage() {
 
   const [viewingSale,   setViewingSale]   = useState<Sale | null>(null);
   const [refundingSale, setRefundingSale] = useState<Sale | null>(null);
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+
+  // ── Row selection
+  const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
+  const [allPagesSelected, setAllPagesSelected] = useState(false);
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "created_at" });
@@ -81,6 +147,49 @@ export default function SalesInvoicesPage() {
   const sales      = data?.data        ?? [];
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
+
+  // ── Selection helpers
+  const handleSelectionChange = useCallback((keys: Set<string>) => {
+    setSelectedKeys(keys);
+    setAllPagesSelected(false);
+  }, []);
+
+  const currentPageKeys    = sales.map((s) => s.id);
+  const allOnPageSelected  = currentPageKeys.length > 0 && currentPageKeys.every((k) => selectedKeys.has(k));
+  const showSelectAllBanner = allOnPageSelected && !allPagesSelected && totalItems > pagination.pageSize;
+
+  function handleSelectAllPages() { setAllPagesSelected(true); }
+  function clearSelection() { setSelectedKeys(new Set()); setAllPagesSelected(false); }
+
+  const selectedItems  = sales.filter((s) => selectedKeys.has(s.id));
+  const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
+
+  // ── Export handlers
+  async function handleExportCsv() {
+    if (allPagesSelected) {
+      setIsExportingCsv(true);
+      try {
+        const exportParams: Record<string, unknown> = {};
+        if (statusFilter) exportParams.status = statusFilter;
+        if (paymentMethodFilter) exportParams.payment_method = paymentMethodFilter;
+        if (startDate) exportParams.start_date = startDate;
+        if (endDate) exportParams.end_date = endDate;
+        if (search) exportParams.search = search;
+        const blob = await apiDownloadFile("/sales/invoices/export", exportParams);
+        downloadBlob(blob, `sales_invoices_${exportDateStamp()}.csv`);
+      } catch {
+        showToast("error", "Export Failed", "Could not export records. Please try again.");
+      } finally {
+        setIsExportingCsv(false);
+      }
+    } else {
+      exportSelectedCsv(selectedItems);
+    }
+  }
+
+  function handleExportPdf() {
+    exportSelectedPdf(selectedItems);
+  }
 
   const columns: Column<Sale>[] = [
     {
@@ -143,7 +252,7 @@ export default function SalesInvoicesPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          LKR {row.total_amount.toFixed(2)}
+          LKR {formatAmount(row.total_amount)}
         </span>
       ),
     },
@@ -216,20 +325,6 @@ export default function SalesInvoicesPage() {
             onSearch={handleSearch}
             className="w-[26rem] max-w-full"
           />
-
-          <div
-            className="flex items-center gap-2 pl-3 ml-1 border-l flex-shrink-0"
-            style={{ borderColor: "var(--color-border)" }}
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Download className="w-3.5 h-3.5" />}
-              onClick={() => downloadCsvExport({ ...filters, ...(search && { search }) })}
-            >
-              Export CSV
-            </Button>
-          </div>
         </div>
       </div>
 
@@ -287,6 +382,33 @@ export default function SalesInvoicesPage() {
       </FilterBar>
 
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
+
+        {showSelectAllBanner && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span style={{ color: "var(--color-text-muted)" }}>
+              {pagination.pageSize} records on this page are selected.{" "}
+            </span>
+            <button onClick={handleSelectAllPages} className="font-semibold text-primary-500 hover:underline">
+              Select all {totalItems} records
+            </button>
+          </div>
+        )}
+
+        {allPagesSelected && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span className="font-semibold text-primary-500">All {totalItems} records selected.</span>{" "}
+            <button onClick={clearSelection} className="hover:underline" style={{ color: "var(--color-text-muted)" }}>
+              Clear selection
+            </button>
+          </div>
+        )}
+
         <DataTable<Sale>
           columns={columns}
           data={sales}
@@ -296,6 +418,9 @@ export default function SalesInvoicesPage() {
           sort={sort}
           onSort={handleSort}
           emptyMessage={search ? `No invoices found matching "${search}"` : "No sales invoices recorded yet."}
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={handleSelectionChange}
         />
 
         <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
@@ -311,6 +436,43 @@ export default function SalesInvoicesPage() {
             />
           )}
         </div>
+
+        {(selectedKeys.size > 0 || allPagesSelected) && (
+          <div
+            className="border-t flex items-center justify-between px-4 py-3 gap-3"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
+          >
+            <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline" size="sm"
+                leftIcon={<FileDown className="w-3.5 h-3.5" />}
+                onClick={handleExportCsv}
+                isLoading={isExportingCsv}
+              >
+                Export CSV
+              </Button>
+              {!allPagesSelected && (
+                <Button
+                  variant="outline" size="sm"
+                  leftIcon={<FileText className="w-3.5 h-3.5" />}
+                  onClick={handleExportPdf}
+                >
+                  Export PDF
+                </Button>
+              )}
+              <button
+                onClick={clearSelection}
+                className="text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <SaleViewModal

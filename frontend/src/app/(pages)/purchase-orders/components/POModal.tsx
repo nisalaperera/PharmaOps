@@ -10,6 +10,7 @@ import { Button }  from "@/components/ui/Button";
 import { Input }   from "@/components/ui/Input";
 import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { showToast }                 from "@/lib/toast";
+import { formatAmount }              from "@/lib/utils";
 import { useAuth }                   from "@/hooks/useAuth";
 import { poCreateSchema, poEditSchema, type POCreateValues, type POEditValues } from "../schemas";
 import type { PurchaseOrder, Supplier, Product, Branch, PaginatedResponse } from "@/types";
@@ -381,7 +382,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
                       color:      "var(--color-text-muted)",
                     }}
                   >
-                    {total.toFixed(2)}
+                    {formatAmount(total)}
                   </div>
 
                   {/* Remove button */}
@@ -408,7 +409,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
           >
             <span style={{ color: "var(--color-text-muted)" }}>Order Total:</span>
             <span className="font-bold tabular-nums text-base" style={{ color: "var(--color-text)" }}>
-              {orderTotal.toFixed(2)}
+              {formatAmount(orderTotal)}
             </span>
           </div>
         </div>

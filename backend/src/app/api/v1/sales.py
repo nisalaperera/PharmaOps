@@ -6,21 +6,15 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.sequences import generate_document_number, get_branch_code
 from app.utils.notify import notify_branch_users
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.models.sale import SaleCreate, SaleUpdate, SaleResponse
 from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/sales/invoices", tags=["Sales"])
 
 SALE_SORT_FIELDS = {"created_at", "total_amount", "customer_name"}
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
-
-def _apply_branch_scope(flt: dict, current_user: dict, branch_id: str | None) -> None:
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        flt["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        flt["branch_id"] = branch_id
 
 
 # ── Export (before /{sale_id}) ────────────────────────────────────────────────
@@ -38,7 +32,7 @@ async def export_sales(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if customer_id:    flt["customer_id"]    = customer_id
     if status:         flt["status"]          = status
     if payment_method: flt["payment_method"]  = payment_method
@@ -95,7 +89,7 @@ async def list_sales(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if customer_id:    flt["customer_id"]    = customer_id
     if status:         flt["status"]          = status
     if payment_method: flt["payment_method"]  = payment_method
@@ -127,6 +121,7 @@ async def list_sales(
 async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_current_user)):
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     if payload.payment_method == "CREDIT" and not payload.customer_id:
         raise HTTPException(status_code=400, detail="Credit sales require a customer")
@@ -163,6 +158,9 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
     change_amount = max(0.0, payload.paid_amount - total_amount)
     doc_id        = new_id()
 
+    branch_code    = get_branch_code(db, payload.branch_id)
+    invoice_number = generate_document_number(db, branch_code, "SI")
+
     is_credit = payload.payment_method == "CREDIT"
     if is_credit:
         if not customer:
@@ -178,6 +176,7 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
 
     sale_data = {
         "_id":            doc_id,
+        "invoice_number": invoice_number,
         **payload.model_dump(exclude={"items"}),
         "customer_name":  customer_name,
         "items":          items_data,
@@ -268,7 +267,9 @@ async def get_sale(sale_id: str, current_user: dict = Depends(get_current_user))
     doc = db[Collections.SALES].find_one({"_id": sale_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sale not found")
-    return SaleResponse(**doc_to_dict(doc))
+    sale = doc_to_dict(doc)
+    ensure_branch_access(sale, current_user)
+    return SaleResponse(**sale)
 
 
 # ── Update (refund) ───────────────────────────────────────────────────────────
@@ -284,7 +285,8 @@ async def update_sale(
     if not doc:
         raise HTTPException(status_code=404, detail="Sale not found")
 
-    sale    = doc_to_dict(doc)
+    sale = doc_to_dict(doc)
+    ensure_branch_access(sale, current_user)
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     updates.update(audit_update_fields(current_user))

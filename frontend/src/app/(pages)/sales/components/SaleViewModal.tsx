@@ -4,7 +4,7 @@ import { Modal }           from "@/components/ui/Modal";
 import { Badge }           from "@/components/ui/Badge";
 import { Button }          from "@/components/ui/Button";
 import { RotateCcw }       from "lucide-react";
-import { formatDateTime }  from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import { SALE_STATUS_VARIANT, PAYMENT_METHOD_VARIANT } from "@/lib/badges";
 import { PAYMENT_METHOD_LABEL, SALE_STATUS_LABEL }     from "@/lib/constants";
 import type { Sale } from "@/types";
@@ -120,17 +120,17 @@ export function SaleViewModal({ isOpen, onClose, sale, canRefund, onRefund }: Sa
                     </td>
                     <td className="text-right">
                       <span className="text-sm tabular-nums" style={{ color: "var(--color-text)" }}>
-                        {item.unit_price.toFixed(2)}
+                        {formatAmount(item.unit_price)}
                       </span>
                     </td>
                     <td className="text-right">
                       <span className="text-sm tabular-nums text-danger-500">
-                        {item.discount > 0 ? `-${item.discount.toFixed(2)}` : "—"}
+                        {item.discount > 0 ? `-${formatAmount(item.discount)}` : "—"}
                       </span>
                     </td>
                     <td className="text-right">
                       <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-                        {item.total_price.toFixed(2)}
+                        {formatAmount(item.total_price)}
                       </span>
                     </td>
                   </tr>
@@ -144,33 +144,33 @@ export function SaleViewModal({ isOpen, onClose, sale, canRefund, onRefund }: Sa
         <div className="rounded-xl px-4 py-3 space-y-1.5" style={{ background: "var(--color-surface-2)" }}>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--color-text-muted)" }}>Subtotal</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {sale.subtotal.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {formatAmount(sale.subtotal)}</span>
           </div>
           {sale.discount_total > 0 && (
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Discount</span>
-              <span className="tabular-nums text-danger-500">-LKR {sale.discount_total.toFixed(2)}</span>
+              <span className="tabular-nums text-danger-500">-LKR {formatAmount(sale.discount_total)}</span>
             </div>
           )}
           <div className="h-px" style={{ background: "var(--color-border)" }} />
           <div className="flex justify-between font-bold">
             <span style={{ color: "var(--color-text)" }}>Total</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {sale.total_amount.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {formatAmount(sale.total_amount)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span style={{ color: "var(--color-text-muted)" }}>Paid</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {sale.paid_amount.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>LKR {formatAmount(sale.paid_amount)}</span>
           </div>
           {sale.payment_method === "CASH" && sale.change_amount > 0 && (
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Change</span>
-              <span className="tabular-nums font-semibold" style={{ color: "#10b981" }}>LKR {sale.change_amount.toFixed(2)}</span>
+              <span className="tabular-nums font-semibold" style={{ color: "#10b981" }}>LKR {formatAmount(sale.change_amount)}</span>
             </div>
           )}
           {(sale.refund_amount ?? 0) > 0 && (
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Refunded</span>
-              <span className="tabular-nums font-semibold text-danger-500">LKR {(sale.refund_amount ?? 0).toFixed(2)}</span>
+              <span className="tabular-nums font-semibold text-danger-500">LKR {formatAmount(sale.refund_amount ?? 0)}</span>
             </div>
           )}
         </div>

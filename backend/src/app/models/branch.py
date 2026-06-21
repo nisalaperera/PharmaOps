@@ -12,6 +12,7 @@ class OperatingHours(BaseModel):
 
 class BranchBase(BaseModel):
     name:                   str = Field(min_length=2, max_length=100)
+    code:                   str = Field(min_length=2, max_length=10)
     address:                str
     phone:                  str
     license_number:         str
@@ -27,6 +28,7 @@ class BranchCreate(BranchBase):
 
 class BranchUpdate(BaseModel):
     name:                   Optional[str] = None
+    code:                   Optional[str] = None
     address:                Optional[str] = None
     phone:                  Optional[str] = None
     license_number:         Optional[str] = None

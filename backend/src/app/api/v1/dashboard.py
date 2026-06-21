@@ -2,11 +2,13 @@ from fastapi import APIRouter, Depends
 from datetime import datetime, timezone, timedelta
 from app.core.database import get_db, Collections, doc_to_dict
 from app.middleware.auth_middleware import get_current_user
-from app.models.dashboard import DashboardStats, RecentSale, BranchSummary
+from app.utils.branch_scope import BRANCH_LEVEL_ROLES
+from app.models.dashboard import (
+    DashboardStats, RecentSale, BranchSummary,
+    DashboardCharts, RevenueTrendPoint, TopProduct, PaymentBreakdown,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
-
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
 
 EXPIRY_DAYS_THRESHOLD = 30
 RECENT_SALES_LIMIT    = 8
@@ -116,4 +118,77 @@ async def dashboard_stats(current_user: dict = Depends(get_current_user)):
         pending_po_count=pending_po_count,
         recent_sales=recent_sales,
         branch_summaries=branch_summaries,
+    )
+
+
+TREND_DAYS        = 30
+TOP_PRODUCTS_LIMIT = 10
+
+
+@router.get("/charts", response_model=DashboardCharts)
+async def dashboard_charts(current_user: dict = Depends(get_current_user)):
+    db  = get_db()
+    now = datetime.now(timezone.utc)
+
+    is_branch_level = current_user["role"] in BRANCH_LEVEL_ROLES
+    branch_flt: dict = {"branch_id": current_user["branch_id"]} if is_branch_level else {}
+
+    trend_start = (now - timedelta(days=TREND_DAYS - 1)).date().isoformat()
+    sales_docs  = list(db[Collections.SALES].find({
+        **branch_flt,
+        "created_at": {"$gte": trend_start},
+        "status":     {"$ne": "REFUNDED"},
+    }))
+
+    # Revenue trend — daily buckets
+    daily: dict[str, dict] = {}
+    for i in range(TREND_DAYS):
+        d = (now - timedelta(days=TREND_DAYS - 1 - i)).date().isoformat()
+        daily[d] = {"amount": 0.0, "count": 0}
+
+    for doc in sales_docs:
+        day = doc.get("created_at", "")[:10]
+        if day in daily:
+            daily[day]["amount"] += doc.get("total_amount", 0)
+            daily[day]["count"]  += 1
+
+    revenue_trend = [
+        RevenueTrendPoint(date=d, amount=round(v["amount"], 2), count=v["count"])
+        for d, v in daily.items()
+    ]
+
+    # Top products — aggregate item quantities and revenue
+    product_agg: dict[str, dict] = {}
+    for doc in sales_docs:
+        for item in doc.get("items", []):
+            name = item.get("product_name", "Unknown")
+            if name not in product_agg:
+                product_agg[name] = {"total_qty": 0, "total_amount": 0.0}
+            product_agg[name]["total_qty"]    += item.get("quantity", 0)
+            product_agg[name]["total_amount"] += item.get("total_price", 0)
+
+    top_products = sorted(
+        [TopProduct(product_name=k, **v) for k, v in product_agg.items()],
+        key=lambda p: p.total_amount,
+        reverse=True,
+    )[:TOP_PRODUCTS_LIMIT]
+
+    # Payment method breakdown
+    method_agg: dict[str, dict] = {}
+    for doc in sales_docs:
+        method = doc.get("payment_method", "OTHER")
+        if method not in method_agg:
+            method_agg[method] = {"count": 0, "amount": 0.0}
+        method_agg[method]["count"]  += 1
+        method_agg[method]["amount"] += doc.get("total_amount", 0)
+
+    payment_breakdown = [
+        PaymentBreakdown(method=k, count=v["count"], amount=round(v["amount"], 2))
+        for k, v in method_agg.items()
+    ]
+
+    return DashboardCharts(
+        revenue_trend=revenue_trend,
+        top_products=top_products,
+        payment_breakdown=payment_breakdown,
     )

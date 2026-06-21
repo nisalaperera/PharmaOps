@@ -2,7 +2,7 @@
 
 import { Modal }  from "@/components/ui/Modal";
 import { Badge }  from "@/components/ui/Badge";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import { SALES_ORDER_STATUS_VARIANT, SALES_ORDER_STATUS_LABEL } from "@/lib/badges";
 import type { SalesOrder } from "@/types";
 
@@ -92,12 +92,12 @@ export function SalesOrderViewModal({ isOpen, onClose, order }: SalesOrderViewMo
                   <tr key={idx} className="border-t" style={{ borderColor: "var(--color-border)" }}>
                     <td className="px-3 py-2 font-medium" style={{ color: "var(--color-text)" }}>{item.product_name}</td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.quantity}</td>
-                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.unit_price.toFixed(2)}</td>
+                    <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.unit_price)}</td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                      {item.discount > 0 ? `-${item.discount.toFixed(2)}` : "—"}
+                      {item.discount > 0 ? `-${formatAmount(item.discount)}` : "—"}
                     </td>
                     <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>
-                      {item.total_price.toFixed(2)}
+                      {formatAmount(item.total_price)}
                     </td>
                   </tr>
                 ))}
@@ -106,18 +106,18 @@ export function SalesOrderViewModal({ isOpen, onClose, order }: SalesOrderViewMo
                 {order.discount_total > 0 && (
                   <tr className="border-t" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
                     <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Subtotal</td>
-                    <td className="px-3 py-1.5 tabular-nums" style={{ color: "var(--color-text)" }}>{order.subtotal.toFixed(2)}</td>
+                    <td className="px-3 py-1.5 tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(order.subtotal)}</td>
                   </tr>
                 )}
                 {order.discount_total > 0 && (
                   <tr style={{ background: "var(--color-surface-2)" }}>
                     <td colSpan={4} className="px-3 py-1.5 text-right text-xs font-medium text-danger-500">Discount</td>
-                    <td className="px-3 py-1.5 tabular-nums text-danger-500">-{order.discount_total.toFixed(2)}</td>
+                    <td className="px-3 py-1.5 tabular-nums text-danger-500">-{formatAmount(order.discount_total)}</td>
                   </tr>
                 )}
                 <tr className="border-t" style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}>
                   <td colSpan={4} className="px-3 py-2 text-right text-xs font-semibold" style={{ color: "var(--color-text-muted)" }}>Total</td>
-                  <td className="px-3 py-2 tabular-nums font-bold" style={{ color: "var(--color-text)" }}>{order.total_amount.toFixed(2)}</td>
+                  <td className="px-3 py-2 tabular-nums font-bold" style={{ color: "var(--color-text)" }}>{formatAmount(order.total_amount)}</td>
                 </tr>
               </tfoot>
             </table>

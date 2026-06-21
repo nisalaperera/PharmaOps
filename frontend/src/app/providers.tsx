@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster, ToastBar, toast, type Toast } from "react-hot-toast";
 import { CheckCircle2, XCircle, Loader2, X } from "lucide-react";
 import { useState } from "react";
+import { BranchProvider } from "@/contexts/BranchContext";
 
 // ─── Theme tokens (inverse — toast is opposite of UI surface) ─────────────────
 
@@ -178,15 +179,17 @@ export function Providers({ children, session }: { children: React.ReactNode; se
   return (
     <SessionProvider session={session}>
       <QueryClientProvider client={queryClient}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem={false}
-          disableTransitionOnChange={false}
-        >
-          {children}
-          <ThemedToaster />
-        </ThemeProvider>
+        <BranchProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem={false}
+            disableTransitionOnChange={false}
+          >
+            {children}
+            <ThemedToaster />
+          </ThemeProvider>
+        </BranchProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

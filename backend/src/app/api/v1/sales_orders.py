@@ -6,6 +6,8 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.sequences import generate_document_number, get_branch_code
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.models.sale_order import (
     SalesOrderCreate, SalesOrderUpdate, SalesOrderResponse,
     ConvertToInvoiceRequest, QuotationPdfRequest,
@@ -15,15 +17,7 @@ from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/sales/orders", tags=["Sales"])
 
-BRANCH_LEVEL_ROLES      = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
 SALES_ORDER_SORT_FIELDS = {"created_at", "updated_at", "total_amount", "status", "customer_name"}
-
-
-def _apply_branch_scope(flt: dict, current_user: dict, branch_id: str | None) -> None:
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        flt["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        flt["branch_id"] = branch_id
 
 
 # ── List ──────────────────────────────────────────────────────────────────────
@@ -42,7 +36,7 @@ async def list_sales_orders(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if status:      flt["status"]      = status
     if customer_id: flt["customer_id"] = customer_id
     if search:      flt.update(build_search_filter(search, ["customer_name"]))
@@ -78,7 +72,7 @@ async def export_sales_orders(
 ):
     db  = get_db()
     flt: dict = {}
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
     if status: flt["status"] = status
     if search: flt.update(build_search_filter(search, ["customer_name"]))
 
@@ -114,6 +108,7 @@ async def create_sales_order(
 ):
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     customer_name = ""
     if payload.customer_id:
@@ -137,8 +132,13 @@ async def create_sales_order(
 
     total_amount = subtotal - discount_total
     doc_id       = new_id()
+
+    branch_code  = get_branch_code(db, payload.branch_id)
+    order_number = generate_document_number(db, branch_code, "SO")
+
     data = {
         "_id":            doc_id,
+        "order_number":   order_number,
         **payload.model_dump(exclude={"items"}),
         "customer_name":  customer_name,
         "items":          items_data,
@@ -172,7 +172,9 @@ async def get_sales_order(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
-    return SalesOrderResponse(**doc_to_dict(doc))
+    order = doc_to_dict(doc)
+    ensure_branch_access(order, current_user)
+    return SalesOrderResponse(**order)
 
 
 # ── Update (DRAFT only) ───────────────────────────────────────────────────────
@@ -187,6 +189,7 @@ async def update_sales_order(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT orders can be edited")
 
@@ -235,13 +238,14 @@ async def confirm_sales_order(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT orders can be confirmed")
 
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.SALES_ORDERS].update_one(
         {"_id": order_id},
-        {"$set": {"status": "CONFIRMED", "confirmed_at": now, "updated_at": now}},
+        {"$set": {"status": "CONFIRMED", "confirmed_at": now, "updated_at": now, **audit_update_fields(current_user)}},
     )
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
@@ -262,13 +266,14 @@ async def cancel_sales_order(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] in ("INVOICED", "CANCELLED"):
         raise HTTPException(status_code=400, detail="Cannot cancel an INVOICED or already CANCELLED order")
 
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.SALES_ORDERS].update_one(
         {"_id": order_id},
-        {"$set": {"status": "CANCELLED", "cancelled_at": now, "updated_at": now}},
+        {"$set": {"status": "CANCELLED", "cancelled_at": now, "updated_at": now, **audit_update_fields(current_user)}},
     )
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
@@ -290,6 +295,7 @@ async def convert_to_invoice(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "CONFIRMED":
         raise HTTPException(status_code=400, detail="Only CONFIRMED orders can be converted to an invoice")
 
@@ -590,6 +596,7 @@ async def export_quotation_pdf(
     doc = db[Collections.SALES_ORDERS].find_one({"_id": order_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Sales order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] not in ("DRAFT", "CONFIRMED"):
         raise HTTPException(status_code=400, detail="Only DRAFT or CONFIRMED orders can be exported as a quotation")
 

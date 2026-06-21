@@ -101,3 +101,4 @@ class Collections:
     SALES_ORDERS                 = "sales_orders"
     PURCHASE_INVOICES            = "purchase_invoices"
     PURCHASE_PAYMENTS            = "purchase_payments"
+    SEQUENCES                    = "sequences"

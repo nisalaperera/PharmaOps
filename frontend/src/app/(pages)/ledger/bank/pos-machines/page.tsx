@@ -1,28 +1,98 @@
 "use client";
 
-import { useState }                   from "react";
+import { useState, useCallback }      from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   CreditCard, Plus, Pencil, Eye, CheckCircle, Trash2, SlidersHorizontal, Banknote,
+  FileDown, FileText,
 } from "lucide-react";
-import { DataTable, type Column }     from "@/components/common/DataTable";
-import { Pagination }                 from "@/components/common/Pagination";
-import { SearchBar }                  from "@/components/common/SearchBar";
-import { FilterBar }                  from "@/components/common/FilterBar";
-import { Button }                     from "@/components/ui/Button";
-import { Badge }                      from "@/components/ui/Badge";
-import { ConfirmModal }               from "@/components/ui/ConfirmModal";
-import { useAuth }                    from "@/hooks/useAuth";
-import { usePagination }              from "@/hooks/usePagination";
-import { apiGet, apiPatch }           from "@/lib/api-client";
-import { showToast }                  from "@/lib/toast";
-import { ACTIVE_STATUS_OPTIONS }      from "@/lib/constants";
-import { getActiveStatusVariant }     from "@/lib/badges";
-import { formatDateTime }             from "@/lib/utils";
-import { PosMachineModal }            from "./components/PosMachineModal";
-import { PosMachineViewModal }        from "./components/PosMachineViewModal";
-import { PosSettleModal }             from "./components/PosSettleModal";
+import { format }                      from "date-fns";
+import jsPDF                           from "jspdf";
+import autoTable                       from "jspdf-autotable";
+import APP_CONFIG                      from "@/lib/config";
+import { DataTable, type Column }      from "@/components/common/DataTable";
+import { Pagination }                  from "@/components/common/Pagination";
+import { SearchBar }                   from "@/components/common/SearchBar";
+import { FilterBar }                   from "@/components/common/FilterBar";
+import { Button }                      from "@/components/ui/Button";
+import { Badge }                       from "@/components/ui/Badge";
+import { ConfirmModal }                from "@/components/ui/ConfirmModal";
+import { useAuth }                     from "@/hooks/useAuth";
+import { usePagination }               from "@/hooks/usePagination";
+import { apiGet, apiPatch, downloadBlob } from "@/lib/api-client";
+import { showToast }                   from "@/lib/toast";
+import { ACTIVE_STATUS_OPTIONS }       from "@/lib/constants";
+import { getActiveStatusVariant }      from "@/lib/badges";
+import { formatAmount, formatDateTime } from "@/lib/utils";
+import { PosMachineModal }             from "./components/PosMachineModal";
+import { PosMachineViewModal }         from "./components/PosMachineViewModal";
+import { PosSettleModal }              from "./components/PosSettleModal";
 import type { BankAccount, PosMachine, PaginatedResponse } from "@/types";
+
+// ─── Export helpers ───────────────────────────────────────────────────────────
+
+function exportDateStamp(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function buildRow(machine: PosMachine): string[] {
+  return [
+    machine.terminal_id,
+    machine.merchant_id ?? "",
+    machine.bank_account_name,
+    machine.bank_name,
+    machine.branch_name,
+    `LKR ${formatAmount(machine.unsettled_amount)}`,
+    machine.is_active ? "Active" : "Inactive",
+  ];
+}
+
+function exportSelectedCsv(selected: PosMachine[]) {
+  const header  = ["Terminal ID", "Merchant ID", "Bank Account", "Bank", "Branch", "Unsettled Amount", "Status"];
+  const rows    = selected.map(buildRow);
+  const csvText = [header, ...rows]
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(blob, `pos_machines_${exportDateStamp()}.csv`);
+}
+
+async function exportSelectedPdf(selected: PosMachine[]) {
+  const doc  = new jsPDF();
+  const head = [["Terminal ID", "Merchant ID", "Bank Account", "Bank", "Branch", "Unsettled Amount", "Status"]];
+  const body = selected.map(buildRow);
+
+  let cursorY = 14;
+  try {
+    const res     = await fetch(APP_CONFIG.orgLogo);
+    const blob    = await res.blob();
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
+    cursorY += 1;
+  } catch {
+    // Logo load failure is non-fatal
+  }
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text(APP_CONFIG.orgName, 28, cursorY + 6);
+  cursorY += 10;
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("POS Machines Report — " + exportDateStamp(), 14, cursorY + 4);
+  cursorY += 10;
+
+  autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
+
+  doc.save(`pos_machines_${exportDateStamp()}.pdf`);
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PosMachinesPage() {
   const { permissions } = useAuth();
@@ -40,6 +110,11 @@ export default function PosMachinesPage() {
   const [viewingMachine,  setViewingMachine]  = useState<PosMachine | null>(null);
   const [settlingMachine, setSettlingMachine] = useState<PosMachine | null>(null);
   const [confirmToggle,   setConfirmToggle]   = useState<PosMachine | null>(null);
+
+  // ── Row selection ────────────────────────────────────────────────────────────
+  const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
+  const [allPagesSelected, setAllPagesSelected] = useState(false);
+  const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
   // ── Pagination ───────────────────────────────────────────────────────────────
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
@@ -101,6 +176,50 @@ export default function PosMachinesPage() {
     },
   });
 
+  // ── Selection helpers ─────────────────────────────────────────────────────────
+
+  const handleSelectionChange = useCallback((keys: Set<string>) => {
+    setSelectedKeys(keys);
+    setAllPagesSelected(false);
+  }, []);
+
+  const currentPageKeys     = machines.map((m) => m.id);
+  const allOnPageSelected   = currentPageKeys.length > 0 && currentPageKeys.every((k) => selectedKeys.has(k));
+  const showSelectAllBanner = allOnPageSelected && !allPagesSelected && totalItems > pagination.pageSize;
+
+  function handleSelectAllPages() { setAllPagesSelected(true); }
+  function clearSelection() { setSelectedKeys(new Set()); setAllPagesSelected(false); }
+
+  const selectedItems  = machines.filter((m) => selectedKeys.has(m.id));
+  const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
+
+  // ── Export handlers ───────────────────────────────────────────────────────────
+
+  async function handleExportCsv() {
+    if (allPagesSelected) {
+      setIsExportingCsv(true);
+      try {
+        const allData = await apiGet<PaginatedResponse<PosMachine>>("/treasury/bank-accounts/pos-machines/machines", {
+          ...queryParams,
+          ...filters,
+          page: 1,
+          page_size: totalItems,
+        });
+        exportSelectedCsv(allData.data);
+      } catch {
+        showToast("error", "Export Failed", "Could not export POS machines. Please try again.");
+      } finally {
+        setIsExportingCsv(false);
+      }
+    } else {
+      exportSelectedCsv(selectedItems);
+    }
+  }
+
+  async function handleExportPdf() {
+    await exportSelectedPdf(selectedItems);
+  }
+
   // ── Columns ───────────────────────────────────────────────────────────────────
   const columns: Column<PosMachine>[] = [
     {
@@ -146,7 +265,7 @@ export default function PosMachinesPage() {
           className="text-sm tabular-nums font-semibold"
           style={{ color: row.unsettled_amount > 0 ? "var(--color-text)" : "var(--color-text-muted)" }}
         >
-          LKR {row.unsettled_amount.toFixed(2)}
+          LKR {formatAmount(row.unsettled_amount)}
         </span>
       ),
     },
@@ -322,6 +441,38 @@ export default function PosMachinesPage() {
 
       {/* ── Table ────────────────────────────────────────────────────────────── */}
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
+
+        {/* Select-all-pages banner */}
+        {showSelectAllBanner && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span style={{ color: "var(--color-text-muted)" }}>
+              {pagination.pageSize} records on this page are selected.{" "}
+            </span>
+            <button
+              onClick={handleSelectAllPages}
+              className="font-semibold text-primary-500 hover:underline"
+            >
+              Select all {totalItems} records
+            </button>
+          </div>
+        )}
+
+        {allPagesSelected && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span className="font-semibold text-primary-500">All {totalItems} records selected.</span>
+            {" "}
+            <button onClick={clearSelection} className="hover:underline" style={{ color: "var(--color-text-muted)" }}>
+              Clear selection
+            </button>
+          </div>
+        )}
+
         <DataTable<PosMachine>
           columns={columns}
           data={machines}
@@ -332,6 +483,9 @@ export default function PosMachinesPage() {
           onSort={handleSort}
           onRowClick={(row) => setViewingMachine(row)}
           emptyMessage={search ? `No POS machines found matching "${search}"` : "No POS machines added yet."}
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={handleSelectionChange}
         />
 
         <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
@@ -347,6 +501,46 @@ export default function PosMachinesPage() {
             />
           )}
         </div>
+
+        {/* Export footer — visible only when rows are selected */}
+        {(selectedKeys.size > 0 || allPagesSelected) && (
+          <div
+            className="border-t flex items-center justify-between px-4 py-3 gap-3"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
+          >
+            <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<FileDown className="w-3.5 h-3.5" />}
+                onClick={handleExportCsv}
+                isLoading={isExportingCsv}
+              >
+                Export CSV
+              </Button>
+              {!allPagesSelected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<FileText className="w-3.5 h-3.5" />}
+                  onClick={handleExportPdf}
+                >
+                  Export PDF
+                </Button>
+              )}
+              <button
+                onClick={clearSelection}
+                className="text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Modals ───────────────────────────────────────────────────────────── */}

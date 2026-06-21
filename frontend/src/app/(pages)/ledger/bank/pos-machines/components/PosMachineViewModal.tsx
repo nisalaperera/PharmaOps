@@ -7,7 +7,7 @@ import { Modal }                       from "@/components/ui/Modal";
 import { Badge }                       from "@/components/ui/Badge";
 import { Button }                      from "@/components/ui/Button";
 import { apiGet }                      from "@/lib/api-client";
-import { formatDate, formatDateTime }  from "@/lib/utils";
+import { formatAmount, formatDate, formatDateTime } from "@/lib/utils";
 import { getActiveStatusVariant, POS_CARD_TYPE_VARIANT } from "@/lib/badges";
 import { POS_CARD_TYPE_FILTER_OPTIONS } from "@/lib/constants";
 import { PosTransactionModal }         from "./PosTransactionModal";
@@ -70,7 +70,7 @@ export function PosMachineViewModal({ isOpen, onClose, machine, canManage }: Pos
                 className="text-xs font-semibold px-2 py-0.5 rounded-full"
                 style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
               >
-                LKR {machine.unsettled_amount.toFixed(2)} unsettled
+                LKR {formatAmount(machine.unsettled_amount)} unsettled
               </span>
             )}
           </div>
@@ -249,7 +249,7 @@ export function PosMachineViewModal({ isOpen, onClose, machine, canManage }: Pos
                           </td>
                           <td className="text-right">
                             <span className="tabular-nums text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                              LKR {txn.amount.toFixed(2)}
+                              LKR {formatAmount(txn.amount)}
                             </span>
                           </td>
                           <td>
@@ -322,7 +322,7 @@ export function PosMachineViewModal({ isOpen, onClose, machine, canManage }: Pos
                           </td>
                           <td className="text-right">
                             <span className="tabular-nums text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                              LKR {s.total_amount.toFixed(2)}
+                              LKR {formatAmount(s.total_amount)}
                             </span>
                           </td>
                           <td>

@@ -28,3 +28,27 @@ class DashboardStats(BaseModel):
     pending_po_count: int = 0
     recent_sales:     list[RecentSale] = []
     branch_summaries: list[BranchSummary] = []
+
+
+class RevenueTrendPoint(BaseModel):
+    date:   str
+    amount: float = 0
+    count:  int = 0
+
+
+class TopProduct(BaseModel):
+    product_name: str
+    total_qty:    int = 0
+    total_amount: float = 0
+
+
+class PaymentBreakdown(BaseModel):
+    method: str
+    count:  int = 0
+    amount: float = 0
+
+
+class DashboardCharts(BaseModel):
+    revenue_trend:     list[RevenueTrendPoint] = []
+    top_products:      list[TopProduct] = []
+    payment_breakdown: list[PaymentBreakdown] = []

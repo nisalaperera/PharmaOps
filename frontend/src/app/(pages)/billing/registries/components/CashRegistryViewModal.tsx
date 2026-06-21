@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Modal }  from "@/components/ui/Modal";
 import { Badge }  from "@/components/ui/Badge";
 import { apiGet } from "@/lib/api-client";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import { getActiveStatusVariant, getRegistryStatusVariant, REGISTRY_TRANSACTION_VARIANT } from "@/lib/badges";
 import { REGISTRY_TRANSACTION_TYPE_LABEL } from "@/lib/constants";
 import type { CashRegistry, CashRegistryTransaction } from "@/types";
@@ -72,7 +72,7 @@ export function CashRegistryViewModal({ isOpen, onClose, registry }: CashRegistr
               className="font-semibold tabular-nums"
               style={{ color: registry.current_balance > 0 ? "var(--color-text)" : "var(--color-text-muted)" }}
             >
-              LKR {registry.current_balance.toFixed(2)}
+              LKR {formatAmount(registry.current_balance)}
             </span>
           </Field>
           <Field label="Responsible Staff">
@@ -156,10 +156,10 @@ export function CashRegistryViewModal({ isOpen, onClose, registry }: CashRegistr
                         </Badge>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-medium" style={{ color: "var(--color-text)" }}>
-                        LKR {tx.amount.toFixed(2)}
+                        LKR {formatAmount(tx.amount)}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                        LKR {tx.balance_after.toFixed(2)}
+                        LKR {formatAmount(tx.balance_after)}
                       </td>
                       <td className="px-3 py-2 text-xs" style={{ color: "var(--color-text-muted)" }}>
                         {tx.notes ?? <span>—</span>}

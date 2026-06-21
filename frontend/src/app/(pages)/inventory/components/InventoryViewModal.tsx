@@ -2,7 +2,7 @@
 
 import { Modal }   from "@/components/ui/Modal";
 import { Badge }   from "@/components/ui/Badge";
-import { daysUntilExpiry } from "@/lib/utils";
+import { daysUntilExpiry, formatAmount, formatQuantity } from "@/lib/utils";
 import type { InventoryItem } from "@/types";
 
 interface InventoryViewModalProps {
@@ -46,7 +46,7 @@ export function InventoryViewModal({
               Total Quantity
             </dt>
             <dd className="text-sm font-semibold mt-1 tabular-nums" style={{ color: "var(--color-text)" }}>
-              {item.total_quantity.toLocaleString()}
+              {formatQuantity(item.total_quantity)}
             </dd>
           </div>
 
@@ -55,7 +55,7 @@ export function InventoryViewModal({
               Min Stock Level
             </dt>
             <dd className="text-sm mt-1 tabular-nums" style={{ color: "var(--color-text)" }}>
-              {item.min_stock_level.toLocaleString()}
+              {formatQuantity(item.min_stock_level)}
             </dd>
           </div>
 
@@ -142,13 +142,13 @@ export function InventoryViewModal({
                           {batch.sku || "—"}
                         </td>
                         <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text)" }}>
-                          {batch.quantity.toLocaleString()}
+                          {formatQuantity(batch.quantity)}
                         </td>
                         <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                          {batch.purchase_price.toFixed(2)}
+                          {formatAmount(batch.purchase_price)}
                         </td>
                         <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                          {batch.selling_price.toFixed(2)}
+                          {formatAmount(batch.selling_price)}
                         </td>
                         <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>
                           {batch.supplier_name || "—"}

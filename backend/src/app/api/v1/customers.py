@@ -112,15 +112,20 @@ async def import_customers(
 
 @router.get("", response_model=PaginatedResponse[CustomerResponse])
 async def list_customers(
-    search:    str | None = Query(default=None),
-    page:      int        = Query(default=1, ge=1),
+    search:    str | None  = Query(default=None),
+    is_active: bool | None = Query(default=None),
+    page:      int         = Query(default=1, ge=1),
     page_size: int        = Query(default=20, ge=1, le=100),
     sort_by:   str | None = Query(default="full_name"),
     sort_dir:  str | None = Query(default="asc"),
     current_user: dict = Depends(get_current_user),
 ):
     db  = get_db()
-    flt = build_search_filter(search, ["full_name", "phone", "email"]) if search else {}
+    flt: dict = {}
+    if is_active is not None:
+        flt["is_active"] = is_active
+    if search:
+        flt.update(build_search_filter(search, ["full_name", "phone", "email"]))
 
     sort_field     = sort_by if sort_by in CUSTOMER_SORT_FIELDS else "full_name"
     sort_direction = -1 if sort_dir == "desc" else 1

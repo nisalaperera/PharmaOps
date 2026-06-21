@@ -16,6 +16,7 @@ import { Button }                 from "@/components/ui/Button";
 import { StatusBadge }            from "@/components/ui/StatusBadge";
 import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPatch, apiDownloadFile, apiUploadFile, downloadBlob } from "@/lib/api-client";
 import { ImportModal }            from "@/components/common/ImportModal";
@@ -66,10 +67,10 @@ function exportSelectedPdf(selectedUsers: User[], branchNameMap: Record<string, 
 
 export default function UsersPage() {
   const { user: me, permissions } = useAuth();
+  const { activeBranchId } = useBranch();
   const canManage = permissions?.isAdmin || permissions?.isManager || permissions?.isBranchAdmin;
 
   const [roleFilter,    setRoleFilter]    = useState("");
-  const [branchFilter,  setBranchFilter]  = useState("");
   const [statusFilter,  setStatusFilter]  = useState<UserStatus | "">("");
   const [filterVisible, setFilterVisible] = useState(false);
   const [modalOpen,     setModalOpen]     = useState(false);
@@ -89,17 +90,16 @@ export default function UsersPage() {
     usePagination({ initialSortField: "full_name" });
 
   const filters = {
-    ...(roleFilter   && { role: roleFilter }),
-    ...(branchFilter && { branch_id: branchFilter }),
-    ...(statusFilter && { status: statusFilter }),
+    ...(roleFilter      && { role: roleFilter }),
+    ...(activeBranchId  && { branch_id: activeBranchId }),
+    ...(statusFilter    && { status: statusFilter }),
   };
 
-  const hasActiveFilters  = roleFilter !== "" || branchFilter !== "" || statusFilter !== "";
-  const activeFilterCount = (roleFilter ? 1 : 0) + (branchFilter ? 1 : 0) + (statusFilter ? 1 : 0);
+  const hasActiveFilters  = roleFilter !== "" || statusFilter !== "";
+  const activeFilterCount = (roleFilter ? 1 : 0) + (statusFilter ? 1 : 0);
 
   function clearFilters() {
     setRoleFilter("");
-    setBranchFilter("");
     setStatusFilter("");
     goToPage(1);
   }
@@ -182,7 +182,7 @@ export default function UsersPage() {
       try {
         const exportParams: Record<string, unknown> = {};
         if (roleFilter)   exportParams.role      = roleFilter;
-        if (branchFilter) exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (statusFilter) exportParams.status    = statusFilter;
         if (search)       exportParams.search    = search;
         const blob = await apiDownloadFile("/users/export", exportParams);
@@ -417,18 +417,6 @@ export default function UsersPage() {
           ))}
         </select>
 
-        {permissions?.isOrgLevel && allBranches.length > 0 && (
-          <select
-            value={branchFilter}
-            onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }}
-            className="form-select w-auto"
-          >
-            <option value="">All Branches</option>
-            {allBranches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
       </FilterBar>
 
       {/* Table card */}

@@ -15,7 +15,7 @@ import { useAuth }                 from "@/hooks/useAuth";
 import { usePagination }           from "@/hooks/usePagination";
 import { apiGet, apiDownloadFile } from "@/lib/api-client";
 import { showToast }               from "@/lib/toast";
-import { formatDateTime }          from "@/lib/utils";
+import { formatDateTime, formatAmount } from "@/lib/utils";
 import {
   SALE_STATUS_FILTER_OPTIONS, PAYMENT_METHOD_FILTER_OPTIONS,
   PAYMENT_METHOD_LABEL,
@@ -150,7 +150,7 @@ export default function SalesPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          LKR {row.total_amount.toFixed(2)}
+          LKR {formatAmount(row.total_amount)}
         </span>
       ),
     },

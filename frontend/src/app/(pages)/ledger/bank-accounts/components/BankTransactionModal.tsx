@@ -8,6 +8,7 @@ import { Modal }          from "@/components/ui/Modal";
 import { Button }         from "@/components/ui/Button";
 import { Input }          from "@/components/ui/Input";
 import { apiPost }        from "@/lib/api-client";
+import { formatAmount }   from "@/lib/utils";
 import { showToast }      from "@/lib/toast";
 import {
   bankTransactionSchema,
@@ -88,7 +89,7 @@ export function BankTransactionModal({
             className="form-input tabular-nums font-semibold"
             style={{ color: "var(--color-text)", background: "var(--color-surface-2)" }}
           >
-            LKR {account.current_balance.toFixed(2)}
+            LKR {formatAmount(account.current_balance)}
           </div>
         </div>
 

@@ -6,6 +6,8 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import effective_branch_id, ensure_branch_access, enforce_branch_on_create, BRANCH_LEVEL_ROLES
+from app.utils.sequences import generate_document_number, get_branch_code
 from app.models.purchase_order import (
     PurchaseOrderCreate, PurchaseOrderUpdate, PurchaseOrderResponse,
 )
@@ -13,31 +15,12 @@ from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/purchases", tags=["Purchases"])
 
-BRANCH_ROLES               = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
 PURCHASE_ORDER_SORT_FIELDS = {"created_at", "updated_at", "total_amount", "return_amount", "status", "supplier_name", "order_date", "order_number"}
 
 
-def _branch_scope(current_user: dict, requested_branch_id: str | None) -> str | None:
-    if current_user["role"] in BRANCH_ROLES:
-        return current_user["branch_id"]
-    return requested_branch_id
-
-
-def _generate_order_number(db, order_date: str) -> str:
-    """Generate MG/PO/yyyy/MM/dd/XX where XX is max+1 sequence for the given date."""
-    date_part = order_date[:10].replace("-", "/")
-    prefix    = f"MG/PO/{date_part}/"
-    pattern   = re.compile(f"^{re.escape(prefix)}(\\d+)$")
-    existing  = db[Collections.PURCHASE_ORDERS].find(
-        {"order_number": {"$regex": f"^{re.escape(prefix)}"}},
-        {"order_number": 1},
-    )
-    max_seq = 0
-    for doc in existing:
-        match = pattern.match(doc.get("order_number", ""))
-        if match:
-            max_seq = max(max_seq, int(match.group(1)))
-    return f"{prefix}{max_seq + 1:02d}"
+def _generate_order_number(db, branch_id: str, order_date: str) -> str:
+    branch_code = get_branch_code(db, branch_id)
+    return generate_document_number(db, branch_code, "PO", ref_date=order_date)
 
 
 def _compute_item_totals(items: list) -> tuple[list, float]:
@@ -82,8 +65,8 @@ async def list_purchase_orders(
     db     = get_db()
     filter = {}
 
-    effective_branch = _branch_scope(current_user, branch_id)
-    if effective_branch: filter["branch_id"] = effective_branch
+    bid = effective_branch_id(current_user, branch_id)
+    if bid:              filter["branch_id"] = bid
     if status:           filter["status"]    = status
     if search:           filter.update(build_search_filter(search, ["supplier_name", "channel_name", "order_number"]))
 
@@ -117,8 +100,8 @@ async def export_purchase_orders(
     db     = get_db()
     filter = {}
 
-    effective_branch = _branch_scope(current_user, branch_id)
-    if effective_branch: filter["branch_id"] = effective_branch
+    bid = effective_branch_id(current_user, branch_id)
+    if bid:              filter["branch_id"] = bid
     if status:           filter["status"]    = status
     if search:           filter.update(build_search_filter(search, ["supplier_name", "channel_name", "order_number"]))
 
@@ -157,6 +140,8 @@ async def create_purchase_order(
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
 
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
+
     supplier_doc     = db[Collections.SUPPLIERS].find_one({"_id": payload.supplier_id, "supplier_type": "DISTRIBUTOR"})
     supplier_name    = supplier_doc.get("short_name", "") if supplier_doc else ""
     channel_name     = ""
@@ -169,7 +154,7 @@ async def create_purchase_order(
                 break
 
     order_date             = payload.order_date
-    order_number           = _generate_order_number(db, order_date)
+    order_number           = _generate_order_number(db, payload.branch_id, order_date)
     items_data, total      = _compute_item_totals(payload.items)
     return_data, ret_total = _compute_return_totals(payload.return_items)
 
@@ -209,6 +194,7 @@ async def submit_for_approval(
     doc = db[Collections.PURCHASE_ORDERS].find_one({"_id": po_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT orders can be submitted")
 
@@ -234,6 +220,7 @@ async def approve_purchase_order(
     doc = db[Collections.PURCHASE_ORDERS].find_one({"_id": po_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "PENDING_APPROVAL":
         raise HTTPException(status_code=400, detail="Only PENDING_APPROVAL orders can be approved")
 
@@ -264,6 +251,7 @@ async def cancel_purchase_order(
     doc = db[Collections.PURCHASE_ORDERS].find_one({"_id": po_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] not in ("DRAFT", "PENDING_APPROVAL"):
         raise HTTPException(status_code=400, detail="Only DRAFT or PENDING_APPROVAL orders can be cancelled")
 
@@ -289,6 +277,7 @@ async def get_purchase_order(
     doc = db[Collections.PURCHASE_ORDERS].find_one({"_id": po_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     return PurchaseOrderResponse(**doc_to_dict(doc))
 
 
@@ -302,6 +291,7 @@ async def update_purchase_order(
     doc = db[Collections.PURCHASE_ORDERS].find_one({"_id": po_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase order not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT orders can be edited")
 

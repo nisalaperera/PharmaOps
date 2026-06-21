@@ -12,6 +12,7 @@ import { Input }        from "@/components/ui/Input";
 import { Autocomplete } from "@/components/ui/Autocomplete";
 import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { showToast }                 from "@/lib/toast";
+import { formatAmount }              from "@/lib/utils";
 import { useAuth }                   from "@/hooks/useAuth";
 import {
   poCreateSchema, poEditSchema,
@@ -389,7 +390,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
 
                   <div className="h-9 flex items-center px-2 rounded-md text-sm tabular-nums"
                     style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>
-                    {lineTotal.toFixed(2)}
+                    {formatAmount(lineTotal)}
                   </div>
 
                   <div className="flex items-center justify-center h-9">
@@ -409,7 +410,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
             style={{ borderColor: "var(--color-border)" }}>
             <span style={{ color: "var(--color-text-muted)" }}>Order Total:</span>
             <span className="font-bold tabular-nums text-base" style={{ color: "var(--color-text)" }}>
-              LKR {orderTotal.toFixed(2)}
+              LKR {formatAmount(orderTotal)}
             </span>
           </div>
         </div>
@@ -485,7 +486,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
 
                       <div className="h-9 flex items-center px-2 rounded-md text-sm tabular-nums"
                         style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>
-                        {lineTotal.toFixed(2)}
+                        {formatAmount(lineTotal)}
                       </div>
 
                       <div className="flex items-center justify-center h-9">
@@ -503,7 +504,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
                 style={{ borderColor: "var(--color-border)" }}>
                 <span style={{ color: "var(--color-text-muted)" }}>Return Total:</span>
                 <span className="font-bold tabular-nums text-base" style={{ color: "var(--color-danger)" }}>
-                  LKR {returnTotal.toFixed(2)}
+                  LKR {formatAmount(returnTotal)}
                 </span>
               </div>
             </>

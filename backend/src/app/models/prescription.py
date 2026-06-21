@@ -29,7 +29,8 @@ class PrescriptionUpdate(BaseModel):
 
 
 class PrescriptionResponse(PrescriptionBase, TimestampMixin):
-    id:           str
+    id:                  str
+    prescription_number: str = ""
     patient_name: str  = ""
     doctor_name:  str  = ""
     is_active:    bool = True

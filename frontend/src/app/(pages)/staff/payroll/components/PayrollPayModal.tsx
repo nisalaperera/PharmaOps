@@ -8,7 +8,8 @@ import { Modal }  from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Select, Textarea } from "@/components/ui/Input";
 import { apiGet, apiPost } from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import { FUND_SOURCE_TYPE_OPTIONS, MONTH_OPTIONS } from "@/lib/constants";
 import { payrollPaySchema, type PayrollPayValues } from "@/app/(pages)/staff/payroll/schemas";
 import type { Payroll, CashRegistry, BankAccount, PaginatedResponse } from "@/types";
@@ -70,11 +71,11 @@ export function PayrollPayModal({ payroll, onClose }: PayrollPayModalProps) {
     sourceType === "CASH_REGISTRY"
       ? registries.map((r) => ({
           value: r.id,
-          label: `${r.name}${r.is_open ? "" : " (Closed)"} - Balance ${r.current_balance.toFixed(2)}`,
+          label: `${r.name}${r.is_open ? "" : " (Closed)"} - Balance ${formatAmount(r.current_balance)}`,
         }))
       : accounts.map((a) => ({
           value: a.id,
-          label: `${a.account_name} (${a.bank_name}) - Balance ${a.current_balance.toFixed(2)}`,
+          label: `${a.account_name} (${a.bank_name}) - Balance ${formatAmount(a.current_balance)}`,
         }));
 
   const selectedBalance =
@@ -124,7 +125,7 @@ export function PayrollPayModal({ payroll, onClose }: PayrollPayModalProps) {
           </div>
           <div className="flex justify-between font-semibold">
             <span style={{ color: "var(--color-text-muted)" }}>Net Salary</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{payroll.net_salary.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(payroll.net_salary)}</span>
           </div>
         </div>
 
@@ -151,7 +152,7 @@ export function PayrollPayModal({ payroll, onClose }: PayrollPayModalProps) {
 
         {insufficientBalance && (
           <p className="text-xs font-medium text-danger-500">
-            Insufficient balance — the selected source holds {selectedBalance!.toFixed(2)} but {payroll.net_salary.toFixed(2)} is required.
+            Insufficient balance — the selected source holds {formatAmount(selectedBalance!)} but {formatAmount(payroll.net_salary)} is required.
           </p>
         )}
 
@@ -171,7 +172,7 @@ export function PayrollPayModal({ payroll, onClose }: PayrollPayModalProps) {
             isLoading={mutation.isPending}
             disabled={!sourceId || insufficientBalance}
           >
-            Pay {payroll.net_salary.toFixed(2)}
+            Pay {formatAmount(payroll.net_salary)}
           </Button>
         </div>
 

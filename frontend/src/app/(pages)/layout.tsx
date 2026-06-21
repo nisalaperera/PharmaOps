@@ -11,12 +11,15 @@ export default function DashboardLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen,       setMobileOpen]       = useState(false);
+  const [isDesktop,        setIsDesktop]         = useState(true);
 
-  // Close mobile sidebar on resize to desktop
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 1024) setMobileOpen(false);
+      const desktop = window.innerWidth >= 1024;
+      setIsDesktop(desktop);
+      if (desktop) setMobileOpen(false);
     };
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -32,7 +35,7 @@ export default function DashboardLayout({
 
       <div
         className="flex flex-col min-h-screen transition-all duration-300"
-        style={{ marginLeft: sidebarCollapsed ? "68px" : "260px" }}
+        style={{ marginLeft: isDesktop ? (sidebarCollapsed ? "68px" : "260px") : 0 }}
       >
         <Header
           onOpenMobileSidebar={() => setMobileOpen(true)}

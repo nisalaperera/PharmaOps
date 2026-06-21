@@ -7,7 +7,7 @@ import { Modal }                            from "@/components/ui/Modal";
 import { Badge }                            from "@/components/ui/Badge";
 import { Button }                           from "@/components/ui/Button";
 import { apiGet }                           from "@/lib/api-client";
-import { formatDate, formatDateTime }       from "@/lib/utils";
+import { formatAmount, formatDate, formatDateTime } from "@/lib/utils";
 import { getActiveStatusVariant, CHEQUE_ISSUE_STATUS_VARIANT } from "@/lib/badges";
 import { CHEQUE_ISSUE_STATUS_FILTER_OPTIONS }                  from "@/lib/constants";
 import { ChequeIssueModal }                 from "./ChequeIssueModal";
@@ -203,7 +203,7 @@ export function ChequeBookViewModal({ isOpen, onClose, book, canManage }: Cheque
                       </td>
                       <td className="text-right">
                         <span className="tabular-nums text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-                          LKR {issue.amount.toFixed(2)}
+                          LKR {formatAmount(issue.amount)}
                         </span>
                       </td>
                       <td>

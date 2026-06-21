@@ -8,13 +8,13 @@ import { signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "./ThemeToggle";
+import { BranchSelector } from "./BranchSelector";
 import { getInitials, getRoleLabel, cn } from "@/lib/utils";
 import { getRoleBadgeColor } from "@/lib/badges";
 import { apiGet } from "@/lib/api-client";
 import APP_CONFIG from "@/lib/config";
 import { ChangePasswordModal }  from "@/app/(pages)/profile/components/ChangePasswordModal";
 import { AttendanceModal }      from "@/app/(pages)/staff/attendance/components/AttendanceModal";
-import type { Branch } from "@/types";
 
 interface HeaderProps {
   onOpenMobileSidebar: () => void;
@@ -27,14 +27,6 @@ export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
   const [changePasswordOpen,  setChangePasswordOpen]  = useState(false);
   const [attendanceModalOpen, setAttendanceModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Fetch branch name when user is assigned to a branch
-  const { data: branch } = useQuery<Branch>({
-    queryKey: ["branch", user?.branchId],
-    queryFn:  () => apiGet<Branch>(`/branches/${user!.branchId}`),
-    enabled:  !!user?.branchId,
-    staleTime: Infinity,
-  });
 
   // Unread notification count — refreshed every minute
   const { data: unread } = useQuery<{ count: number }>({
@@ -59,9 +51,13 @@ export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
   return (
     <>
     <header
-      className="fixed top-0 right-0 z-30 flex items-center justify-between h-16 px-4 border-b transition-all duration-300"
+      className={cn(
+        "fixed top-0 right-0 z-30 flex items-center justify-between h-16 px-4 border-b transition-all duration-300",
+        "left-0",
+        sidebarCollapsed ? "lg:left-[68px]" : "lg:left-[260px]",
+      )}
       style={{
-        left:        `${sidebarCollapsed ? 68 : 260}px`,
+        left:        undefined,
         background:  "var(--color-surface)",
         borderColor: "var(--color-border)",
       }}
@@ -85,21 +81,16 @@ export function Header({ onOpenMobileSidebar, sidebarCollapsed }: HeaderProps) {
             height={36}
             className="rounded-lg object-contain flex-shrink-0"
           />
-          <div>
-            <p className="text-xl font-semibold leading-tight" style={{ color: "var(--color-text)" }}>
-              {APP_CONFIG.orgName}
-            </p>
-            {branch && (
-              <p className="text-[11px] leading-tight" style={{ color: "var(--color-text-muted)" }}>
-                {branch.name}
-              </p>
-            )}
-          </div>
+          <p className="text-xl font-semibold leading-tight" style={{ color: "var(--color-text)" }}>
+            {APP_CONFIG.orgName}
+          </p>
         </div>
       </div>
 
-      {/* Right: attendance shortcut + theme toggle + notifications + user */}
+      {/* Right: branch selector + attendance shortcut + theme toggle + notifications + user */}
       <div className="flex items-center gap-3">
+        <BranchSelector />
+
         <button
           onClick={() => setAttendanceModalOpen(true)}
           className="p-2 rounded-lg transition-colors hover:bg-[var(--color-surface-2)]"

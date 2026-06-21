@@ -44,6 +44,21 @@ export function formatCurrency(
   }).format(amount);
 }
 
+/** Format amount as ###,###.## (two decimals, thousands separators, no currency symbol) */
+export function formatAmount(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+/** Format non-currency quantity as ###,### (thousands separators, no decimals) */
+export function formatQuantity(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 /** Format date */
 export function formatDate(
   dateString: string,

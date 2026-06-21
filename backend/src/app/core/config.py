@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     login_max_attempts:   int = 5
     login_window_minutes: int = 15
 
+    # Document numbering
+    chain_prefix: str = "MG"
+
     # Audit log retention in days (0 = keep forever)
     audit_log_retention_days: int = 365
 

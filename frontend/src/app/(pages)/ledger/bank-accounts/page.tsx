@@ -1,41 +1,109 @@
-﻿"use client";
+"use client";
 
-import { useState }                  from "react";
+import { useState, useCallback }   from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   Landmark, Plus, Pencil, Eye, Trash2, CheckCircle,
   ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal,
+  FileDown, FileText,
 } from "lucide-react";
-import { DataTable, type Column } from "@/components/common/DataTable";
-import { Pagination }              from "@/components/common/Pagination";
-import { SearchBar }               from "@/components/common/SearchBar";
-import { FilterBar }               from "@/components/common/FilterBar";
-import { Button }                  from "@/components/ui/Button";
-import { Badge }                   from "@/components/ui/Badge";
-import { ConfirmModal }            from "@/components/ui/ConfirmModal";
-import { useAuth }                 from "@/hooks/useAuth";
-import { usePagination }           from "@/hooks/usePagination";
-import { apiGet, apiPatch }        from "@/lib/api-client";
-import { showToast }               from "@/lib/toast";
-import { ACTIVE_STATUS_OPTIONS }   from "@/lib/constants";
-import { getActiveStatusVariant }  from "@/lib/badges";
-import { BankAccountModal }        from "@/app/(pages)/ledger/bank-accounts/components/BankAccountModal";
-import { BankAccountViewModal }    from "@/app/(pages)/ledger/bank-accounts/components/BankAccountViewModal";
-import { BankTransactionModal }    from "@/app/(pages)/ledger/bank-accounts/components/BankTransactionModal";
+import { format }                   from "date-fns";
+import jsPDF                        from "jspdf";
+import autoTable                    from "jspdf-autotable";
+import APP_CONFIG                   from "@/lib/config";
+import { DataTable, type Column }   from "@/components/common/DataTable";
+import { Pagination }               from "@/components/common/Pagination";
+import { SearchBar }                from "@/components/common/SearchBar";
+import { FilterBar }                from "@/components/common/FilterBar";
+import { Button }                   from "@/components/ui/Button";
+import { Badge }                    from "@/components/ui/Badge";
+import { ConfirmModal }             from "@/components/ui/ConfirmModal";
+import { useAuth }                  from "@/hooks/useAuth";
+import { usePagination }            from "@/hooks/usePagination";
+import { apiGet, apiPatch, downloadBlob } from "@/lib/api-client";
+import { formatAmount }             from "@/lib/utils";
+import { showToast }                from "@/lib/toast";
+import { ACTIVE_STATUS_OPTIONS }    from "@/lib/constants";
+import { getActiveStatusVariant }   from "@/lib/badges";
+import { BankAccountModal }         from "@/app/(pages)/ledger/bank-accounts/components/BankAccountModal";
+import { BankAccountViewModal }     from "@/app/(pages)/ledger/bank-accounts/components/BankAccountViewModal";
+import { BankTransactionModal }     from "@/app/(pages)/ledger/bank-accounts/components/BankTransactionModal";
 import type { BankAccount, PaginatedResponse } from "@/types";
 
-// â”€â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Export helpers ───────────────────────────────────────────────────────────
+
+function exportDateStamp(): string {
+  return format(new Date(), "yyyy-MM-dd");
+}
+
+function buildRow(account: BankAccount): string[] {
+  return [
+    account.account_name,
+    account.account_number,
+    account.bank_name,
+    account.branch_name,
+    `LKR ${formatAmount(account.current_balance)}`,
+    account.is_active ? "Active" : "Inactive",
+  ];
+}
+
+function exportSelectedCsv(selected: BankAccount[]) {
+  const header  = ["Account Name", "Account Number", "Bank", "Branch", "Balance", "Status"];
+  const rows    = selected.map(buildRow);
+  const csvText = [header, ...rows]
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
+  downloadBlob(blob, `bank_accounts_${exportDateStamp()}.csv`);
+}
+
+async function exportSelectedPdf(selected: BankAccount[]) {
+  const doc  = new jsPDF();
+  const head = [["Account Name", "Account Number", "Bank", "Branch", "Balance", "Status"]];
+  const body = selected.map(buildRow);
+
+  let cursorY = 14;
+  try {
+    const res     = await fetch(APP_CONFIG.orgLogo);
+    const blob    = await res.blob();
+    const dataUrl = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(blob);
+    });
+    doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
+    cursorY += 1;
+  } catch {
+    // Logo load failure is non-fatal
+  }
+
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  doc.text(APP_CONFIG.orgName, 28, cursorY + 6);
+  cursorY += 10;
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Bank Accounts Report — " + exportDateStamp(), 14, cursorY + 4);
+  cursorY += 10;
+
+  autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
+
+  doc.save(`bank_accounts_${exportDateStamp()}.pdf`);
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BankAccountsPage() {
   const { permissions } = useAuth();
   const canManage       = permissions?.can("BRANCH_MANAGER") ?? false;
 
-  // â”€â”€ Filter state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Filter state ────────────────────────────────────────────────────────────
 
   const [isActiveFilter, setIsActiveFilter] = useState("");
   const [filterVisible,  setFilterVisible]  = useState(false);
 
-  // â”€â”€ Modal state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Modal state ─────────────────────────────────────────────────────────────
 
   const [modalOpen,         setModalOpen]         = useState(false);
   const [editingAccount,    setEditingAccount]     = useState<BankAccount | null>(null);
@@ -46,12 +114,18 @@ export default function BankAccountsPage() {
   } | null>(null);
   const [confirmToggle,     setConfirmToggle]      = useState<BankAccount | null>(null);
 
-  // â”€â”€ Pagination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Row selection ───────────────────────────────────────────────────────────
+
+  const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
+  const [allPagesSelected, setAllPagesSelected] = useState(false);
+  const [isExportingCsv,   setIsExportingCsv]   = useState(false);
+
+  // ── Pagination ──────────────────────────────────────────────────────────────
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "account_name" });
 
-  // â”€â”€ Filters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Filters ─────────────────────────────────────────────────────────────────
 
   const filters = {
     ...(isActiveFilter && { is_active: isActiveFilter }),
@@ -70,7 +144,7 @@ export default function BankAccountsPage() {
     setFilterVisible(false);
   }
 
-  // â”€â”€ Data fetching â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Data fetching ────────────────────────────────────────────────────────────
 
   const queryClient = useQueryClient();
 
@@ -84,7 +158,7 @@ export default function BankAccountsPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  // â”€â”€ Toggle status mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Toggle status mutation ───────────────────────────────────────────────────
 
   const toggleStatusMutation = useMutation({
     mutationFn: (account: BankAccount) =>
@@ -105,7 +179,49 @@ export default function BankAccountsPage() {
     },
   });
 
-  // â”€â”€ Column definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Selection helpers ────────────────────────────────────────────────────────
+
+  const handleSelectionChange = useCallback((keys: Set<string>) => {
+    setSelectedKeys(keys);
+    setAllPagesSelected(false);
+  }, []);
+
+  const currentPageKeys    = accounts.map((a) => a.id);
+  const allOnPageSelected  = currentPageKeys.length > 0 && currentPageKeys.every((k) => selectedKeys.has(k));
+  const showSelectAllBanner = allOnPageSelected && !allPagesSelected && totalItems > pagination.pageSize;
+
+  function handleSelectAllPages() { setAllPagesSelected(true); }
+  function clearSelection() { setSelectedKeys(new Set()); setAllPagesSelected(false); }
+
+  const selectedItems  = accounts.filter((a) => selectedKeys.has(a.id));
+  const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
+
+  // ── Export handlers ──────────────────────────────────────────────────────────
+
+  async function handleExportCsv() {
+    if (allPagesSelected) {
+      setIsExportingCsv(true);
+      try {
+        const exportParams: Record<string, unknown> = { page: 1, page_size: totalItems };
+        if (isActiveFilter) exportParams.is_active = isActiveFilter;
+        if (search) exportParams.search = search;
+        const allData = await apiGet<PaginatedResponse<BankAccount>>("/treasury/bank-accounts", exportParams);
+        exportSelectedCsv(allData.data);
+      } catch {
+        showToast("error", "Export Failed", "Could not export records. Please try again.");
+      } finally {
+        setIsExportingCsv(false);
+      }
+    } else {
+      exportSelectedCsv(selectedItems);
+    }
+  }
+
+  function handleExportPdf() {
+    exportSelectedPdf(selectedItems);
+  }
+
+  // ── Column definitions ───────────────────────────────────────────────────────
 
   const columns: Column<BankAccount>[] = [
     {
@@ -146,7 +262,7 @@ export default function BankAccountsPage() {
       header: "Balance",
       render: (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          LKR {row.current_balance.toFixed(2)}
+          LKR {formatAmount(row.current_balance)}
         </span>
       ),
     },
@@ -233,14 +349,14 @@ export default function BankAccountsPage() {
     },
   ];
 
-  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Derived ──────────────────────────────────────────────────────────────────
 
   const isDeactivating = confirmToggle?.is_active === true;
 
   return (
     <div className="page-container">
 
-      {/* â”€â”€ Page header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -267,7 +383,7 @@ export default function BankAccountsPage() {
           </Button>
 
           <SearchBar
-            placeholder="Search by account name, bankâ€¦"
+            placeholder="Search by account name, bank..."
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />
@@ -289,7 +405,7 @@ export default function BankAccountsPage() {
         </div>
       </div>
 
-      {/* â”€â”€ Filter bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Filter bar ──────────────────────────────────────────────────────── */}
       <FilterBar
         isVisible={filterVisible}
         hasActiveFilters={hasActiveFilters}
@@ -312,8 +428,35 @@ export default function BankAccountsPage() {
         </div>
       </FilterBar>
 
-      {/* â”€â”€ Table card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Table card ──────────────────────────────────────────────────────── */}
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
+
+        {showSelectAllBanner && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span style={{ color: "var(--color-text-muted)" }}>
+              {pagination.pageSize} records on this page are selected.{" "}
+            </span>
+            <button onClick={handleSelectAllPages} className="font-semibold text-primary-500 hover:underline">
+              Select all {totalItems} records
+            </button>
+          </div>
+        )}
+
+        {allPagesSelected && (
+          <div
+            className="px-4 py-2 text-sm text-center border-b"
+            style={{ background: "var(--color-surface-2)", borderColor: "var(--color-border)" }}
+          >
+            <span className="font-semibold text-primary-500">All {totalItems} records selected.</span>{" "}
+            <button onClick={clearSelection} className="hover:underline" style={{ color: "var(--color-text-muted)" }}>
+              Clear selection
+            </button>
+          </div>
+        )}
+
         <DataTable<BankAccount>
           columns={columns}
           data={accounts}
@@ -323,6 +466,9 @@ export default function BankAccountsPage() {
           sort={sort}
           onSort={handleSort}
           emptyMessage={search ? `No accounts found matching "${search}"` : "No bank accounts found."}
+          selectable
+          selectedKeys={selectedKeys}
+          onSelectionChange={handleSelectionChange}
         />
 
         {/* Pagination */}
@@ -339,9 +485,47 @@ export default function BankAccountsPage() {
             />
           )}
         </div>
+
+        {/* Selection action bar */}
+        {(selectedKeys.size > 0 || allPagesSelected) && (
+          <div
+            className="border-t flex items-center justify-between px-4 py-3 gap-3"
+            style={{ borderColor: "var(--color-border)", background: "var(--color-surface-2)" }}
+          >
+            <p className="text-sm font-medium" style={{ color: "var(--color-text)" }}>
+              {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline" size="sm"
+                leftIcon={<FileDown className="w-3.5 h-3.5" />}
+                onClick={handleExportCsv}
+                isLoading={isExportingCsv}
+              >
+                Export CSV
+              </Button>
+              {!allPagesSelected && (
+                <Button
+                  variant="outline" size="sm"
+                  leftIcon={<FileText className="w-3.5 h-3.5" />}
+                  onClick={handleExportPdf}
+                >
+                  Export PDF
+                </Button>
+              )}
+              <button
+                onClick={clearSelection}
+                className="text-xs px-2 py-1 rounded transition-colors hover:bg-[var(--color-surface)]"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* â”€â”€ Modals â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <BankAccountModal
         isOpen={modalOpen}
         onClose={() => { setModalOpen(false); setEditingAccount(null); }}

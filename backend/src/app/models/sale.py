@@ -47,6 +47,7 @@ class SaleUpdate(BaseModel):
 
 class SaleResponse(SaleCreate, TimestampMixin):
     id:              str
+    invoice_number:  str = ""
     customer_name:   str = ""
     subtotal:        float = 0
     discount_total:  float = 0

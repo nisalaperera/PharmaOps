@@ -8,8 +8,9 @@ import { DollarSign } from "lucide-react";
 import { Modal }    from "@/components/ui/Modal";
 import { Button }   from "@/components/ui/Button";
 import { Input, Select, Textarea } from "@/components/ui/Input";
-import { showToast } from "@/lib/toast";
-import { apiPost }   from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { formatAmount } from "@/lib/utils";
 import { CREDIT_PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
 import { creditPaymentSchema, type CreditPaymentValues } from "../schemas";
 import type { Sale, CreditPayment } from "@/types";
@@ -73,7 +74,7 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
 
   function onSubmit(data: CreditPaymentValues) {
     if (data.amount > remainingDue) {
-      showToast("error", "Amount Too High", `Payment cannot exceed the remaining due of ${remainingDue.toFixed(2)}.`);
+      showToast("error", "Amount Too High", `Payment cannot exceed the remaining due of ${formatAmount(remainingDue)}.`);
       return;
     }
     mutation.mutate(data);
@@ -96,15 +97,15 @@ export function CreditPaymentModal({ sale, branchId, onClose }: CreditPaymentMod
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--color-text-muted)" }}>Sale Total</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{sale.total_amount.toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(sale.total_amount)}</span>
           </div>
           <div className="flex justify-between">
             <span style={{ color: "var(--color-text-muted)" }}>Settled So Far</span>
-            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{(sale.credit_settled_amount ?? 0).toFixed(2)}</span>
+            <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(sale.credit_settled_amount ?? 0)}</span>
           </div>
           <div className="flex justify-between font-semibold">
             <span style={{ color: "var(--color-text-muted)" }}>Remaining Due</span>
-            <span className="tabular-nums text-warning-600">{remainingDue.toFixed(2)}</span>
+            <span className="tabular-nums text-warning-600">{formatAmount(remainingDue)}</span>
           </div>
         </div>
 

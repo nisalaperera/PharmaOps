@@ -16,9 +16,11 @@ import { FilterBar }              from "@/components/common/FilterBar";
 import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
+import { formatAmount }           from "@/lib/utils";
 import {
   MONTH_OPTIONS, MONTH_FILTER_OPTIONS,
   PAYROLL_PAID_FILTER_OPTIONS,
@@ -119,10 +121,10 @@ async function exportSelectedPdf(selected: Payroll[], branchName?: string) {
 
 export default function PayrollPage() {
   const { permissions } = useAuth();
+  const { activeBranchId } = useBranch();
   const canManage = (permissions?.isAdmin || permissions?.isManager || permissions?.isBranchAdmin) ?? false;
 
   // â€” Filters
-  const [branchFilter,  setBranchFilter]  = useState("");
   const [monthFilter,   setMonthFilter]   = useState("");
   const [yearFilter,    setYearFilter]    = useState("");
   const [paidFilter,    setPaidFilter]    = useState("");
@@ -142,17 +144,17 @@ export default function PayrollPage() {
     usePagination({ initialSortField: "created_at", initialSortDirection: "desc" });
 
   const filters = {
-    ...(branchFilter && { branch_id: branchFilter }),
-    ...(monthFilter  && { month:     monthFilter  }),
-    ...(yearFilter   && { year:      yearFilter   }),
-    ...(paidFilter   && { is_paid:   paidFilter   }),
+    ...(activeBranchId && { branch_id: activeBranchId }),
+    ...(monthFilter    && { month:     monthFilter  }),
+    ...(yearFilter     && { year:      yearFilter   }),
+    ...(paidFilter     && { is_paid:   paidFilter   }),
   };
 
-  const hasActiveFilters  = branchFilter !== "" || monthFilter !== "" || yearFilter !== "" || paidFilter !== "";
-  const activeFilterCount = (branchFilter ? 1 : 0) + (monthFilter ? 1 : 0) + (yearFilter ? 1 : 0) + (paidFilter ? 1 : 0);
+  const hasActiveFilters  = monthFilter !== "" || yearFilter !== "" || paidFilter !== "";
+  const activeFilterCount = (monthFilter ? 1 : 0) + (yearFilter ? 1 : 0) + (paidFilter ? 1 : 0);
 
   function clearFilters() {
-    setBranchFilter(""); setMonthFilter(""); setYearFilter(""); setPaidFilter("");
+    setMonthFilter(""); setYearFilter(""); setPaidFilter("");
     goToPage(1);
   }
 
@@ -182,7 +184,7 @@ export default function PayrollPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  const currentBranchName = branchFilter ? (branchNameMap[branchFilter] ?? undefined) : undefined;
+  const currentBranchName = activeBranchId ? (branchNameMap[activeBranchId] ?? undefined) : undefined;
 
   // â”€â”€â”€ Mark as paid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -210,7 +212,7 @@ export default function PayrollPage() {
       setIsExportingCsv(true);
       try {
         const exportParams: Record<string, unknown> = {};
-        if (branchFilter) exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (monthFilter)  exportParams.month      = monthFilter;
         if (yearFilter)   exportParams.year       = yearFilter;
         if (paidFilter)   exportParams.is_paid    = paidFilter;
@@ -276,11 +278,11 @@ export default function PayrollPage() {
       render:   (row) => (
         <div>
           <p className="text-sm tabular-nums" style={{ color: "var(--color-text)" }}>
-            {row.gross_salary.toFixed(2)}
+            {formatAmount(row.gross_salary)}
           </p>
           {row.deductions.length > 0 && (
             <p className="text-xs tabular-nums text-danger-500 mt-0.5">
-              âˆ’ {row.total_deductions.toFixed(2)}&thinsp;
+              âˆ’ {formatAmount(row.total_deductions)}&thinsp;
               <span className="font-normal" style={{ color: "var(--color-text-muted)" }}>
                 ({row.deductions.map((d) => deductionLabel(d.type)).join(", ")})
               </span>
@@ -295,7 +297,7 @@ export default function PayrollPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          {row.net_salary.toFixed(2)}
+          {formatAmount(row.net_salary)}
         </span>
       ),
     },
@@ -390,19 +392,6 @@ export default function PayrollPage() {
 
       {/* â”€â”€ Filter bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <FilterBar isVisible={filterVisible} hasActiveFilters={hasActiveFilters} onClear={clearFilters} onHide={hideFilters}>
-        {permissions?.isOrgLevel && allBranches.length > 0 && (
-          <select
-            value={branchFilter}
-            onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }}
-            className="form-select w-auto"
-          >
-            <option value="">All Branches</option>
-            {allBranches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        )}
-
         <select
           value={monthFilter}
           onChange={(e) => { setMonthFilter(e.target.value); goToPage(1); }}

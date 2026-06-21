@@ -15,6 +15,7 @@ from app.models.product import (
     ProductSkuCreate, ProductSkuUpdate, ProductSkuResponse,
 )
 from app.models.common import PaginatedResponse
+from app.utils.audit import audit_create_fields, audit_update_fields
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -29,11 +30,11 @@ def _simple_list(collection: str, response_model):
     return [response_model(**doc_to_dict(d)) for d in docs]
 
 
-def _simple_create(collection: str, payload, response_model):
+def _simple_create(collection: str, payload, response_model, current_user: dict):
     db     = get_db()
     doc_id = new_id()
     now    = datetime.now(timezone.utc).isoformat()
-    data   = {"_id": doc_id, **payload.model_dump(), "created_at": now}
+    data   = {"_id": doc_id, **payload.model_dump(), "created_at": now, "updated_at": now, **audit_create_fields(current_user)}
     db[collection].insert_one(data)
     return response_model(**doc_to_dict(data))
 
@@ -89,7 +90,7 @@ async def create_generic(payload: ProductGenericCreate, current_user: dict = Dep
     db = get_db()
     if db[Collections.GENERICS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A generic named '{payload.name}' already exists.")
-    return _simple_create(Collections.GENERICS, payload, ProductGenericResponse)
+    return _simple_create(Collections.GENERICS, payload, ProductGenericResponse, current_user)
 
 @router.get("/generics/export")
 async def export_generics(current_user: dict = Depends(get_current_user)):
@@ -135,7 +136,8 @@ async def import_generics(
             db[Collections.GENERICS].update_one(
                 {"_id": existing["_id"]},
                 {"$set": {"name": name, "description": description,
-                           "updated_at": datetime.now(timezone.utc).isoformat()}},
+                           "updated_at": datetime.now(timezone.utc).isoformat(),
+                           **audit_update_fields(current_user)}},
             )
             updated += 1
         else:
@@ -143,6 +145,8 @@ async def import_generics(
                 "_id": new_id(), "name": name, "description": description,
                 "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                **audit_create_fields(current_user),
             })
             created += 1
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
@@ -163,6 +167,8 @@ async def update_generic(
         })
         if duplicate:
             raise HTTPException(status_code=409, detail=f"A generic named '{updates['name']}' already exists.")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates.update(audit_update_fields(current_user))
     db[Collections.GENERICS].update_one({"_id": generic_id}, {"$set": updates})
     return ProductGenericResponse(**doc_to_dict(db[Collections.GENERICS].find_one({"_id": generic_id})))
 
@@ -184,7 +190,7 @@ async def create_brand(payload: ProductBrandCreate, current_user: dict = Depends
     db = get_db()
     if db[Collections.BRANDS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A brand named '{payload.name}' already exists.")
-    return _simple_create(Collections.BRANDS, payload, ProductBrandResponse)
+    return _simple_create(Collections.BRANDS, payload, ProductBrandResponse, current_user)
 
 @router.get("/brands/export")
 async def export_brands(current_user: dict = Depends(get_current_user)):
@@ -232,7 +238,8 @@ async def import_brands(
                 {"_id": existing["_id"]},
                 {"$set": {"name": name, "manufacturer_name": manufacturer_name,
                            "description": description,
-                           "updated_at": datetime.now(timezone.utc).isoformat()}},
+                           "updated_at": datetime.now(timezone.utc).isoformat(),
+                           **audit_update_fields(current_user)}},
             )
             updated += 1
         else:
@@ -240,6 +247,8 @@ async def import_brands(
                 "_id": new_id(), "name": name, "manufacturer_name": manufacturer_name,
                 "description": description, "is_active": True,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                **audit_create_fields(current_user),
             })
             created += 1
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
@@ -260,6 +269,8 @@ async def update_brand(
         })
         if duplicate:
             raise HTTPException(status_code=409, detail=f"A brand named '{updates['name']}' already exists.")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates.update(audit_update_fields(current_user))
     db[Collections.BRANDS].update_one({"_id": brand_id}, {"$set": updates})
     return ProductBrandResponse(**doc_to_dict(db[Collections.BRANDS].find_one({"_id": brand_id})))
 
@@ -316,7 +327,7 @@ async def create_category(
         raise HTTPException(status_code=409, detail=f"A category named '{payload.name}' already exists {scope}.")
     doc_id = new_id()
     now    = datetime.now(timezone.utc).isoformat()
-    data   = {"_id": doc_id, **payload.model_dump(), "created_at": now}
+    data   = {"_id": doc_id, **payload.model_dump(), "created_at": now, "updated_at": now, **audit_create_fields(current_user)}
     db[Collections.CATEGORIES].insert_one(data)
     cat              = doc_to_dict(data)
     cat["parent_name"] = _lookup_name(Collections.CATEGORIES, payload.parent_id) if payload.parent_id else None
@@ -385,13 +396,16 @@ async def import_categories(
                 {"_id": existing["_id"]},
                 {"$set": {"name": name, "description": description, "parent_id": parent_id,
                            "is_active": is_active,
-                           "updated_at": datetime.now(timezone.utc).isoformat()}},
+                           "updated_at": datetime.now(timezone.utc).isoformat(),
+                           **audit_update_fields(current_user)}},
             )
             updated += 1
         else:
             db[Collections.CATEGORIES].insert_one({
                 "_id": new_id(), "name": name, "description": description, "parent_id": parent_id,
                 "is_active": is_active, "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                **audit_create_fields(current_user),
             })
             created += 1
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
@@ -431,6 +445,8 @@ async def update_category(
             raise HTTPException(status_code=409, detail=f"A category named '{effective_name}' already exists {scope}.")
 
     if updates:
+        updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+        updates.update(audit_update_fields(current_user))
         db[Collections.CATEGORIES].update_one({"_id": category_id}, {"$set": updates})
 
     doc              = doc_to_dict(db[Collections.CATEGORIES].find_one({"_id": category_id}))
@@ -459,7 +475,7 @@ async def create_sku(payload: ProductSkuCreate, current_user: dict = Depends(req
     db = get_db()
     if db[Collections.SKUS].find_one({"name": {"$regex": f"^{re.escape(payload.name.strip())}$", "$options": "i"}}):
         raise HTTPException(status_code=409, detail=f"A SKU named '{payload.name}' already exists.")
-    return _simple_create(Collections.SKUS, payload, ProductSkuResponse)
+    return _simple_create(Collections.SKUS, payload, ProductSkuResponse, current_user)
 
 @router.get("/skus/export")
 async def export_skus(
@@ -530,7 +546,8 @@ async def import_skus(
                 {"_id": existing["_id"]},
                 {"$set": {"name": name, "plural": plural, "sku_type": sku_type,
                            "is_active": is_active,
-                           "updated_at": datetime.now(timezone.utc).isoformat()}},
+                           "updated_at": datetime.now(timezone.utc).isoformat(),
+                           **audit_update_fields(current_user)}},
             )
             updated += 1
         else:
@@ -538,6 +555,8 @@ async def import_skus(
                 "_id": new_id(), "name": name, "plural": plural,
                 "sku_type": sku_type, "is_active": is_active,
                 "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                **audit_create_fields(current_user),
             })
             created += 1
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
@@ -557,6 +576,8 @@ async def update_sku(
             "_id":  {"$ne": sku_id},
         }):
             raise HTTPException(status_code=409, detail=f"A SKU named '{updates['name']}' already exists.")
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
+    updates.update(audit_update_fields(current_user))
     db[Collections.SKUS].update_one({"_id": sku_id}, {"$set": updates})
     return ProductSkuResponse(**doc_to_dict(db[Collections.SKUS].find_one({"_id": sku_id})))
 
@@ -805,6 +826,7 @@ async def import_products(
                 "basic_sku_id": basic_sku_id, "basic_sku_name": basic_sku_name,
                 "barcode": barcode, "specific_instructions": specific_instructions,
                 "is_active": is_active, "last_modified_at": now,
+                **audit_update_fields(current_user),
             }
             if sku_mappings is not None:
                 update_data["sku_mappings"] = sku_mappings
@@ -828,6 +850,7 @@ async def import_products(
                 "is_active":             is_active,
                 "created_at":            now,
                 "last_modified_at":      now,
+                **audit_create_fields(current_user),
             })
             created += 1
 

@@ -21,6 +21,7 @@ class StockTransferCreate(BaseModel):
 
 class StockTransferResponse(StockTransferCreate, TimestampMixin):
     id:                      str
+    transfer_number:         str = ""
     source_branch_name:      str = ""
     destination_branch_name: str = ""
     status:                  TransferStatus = "PENDING"

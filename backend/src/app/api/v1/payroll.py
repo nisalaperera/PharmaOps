@@ -6,6 +6,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import require_min_role, get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.utils.treasury_posting import (
     _get_source_doc, _source_display_name,
     _create_cash_transaction, _create_bank_transaction,
@@ -18,16 +19,6 @@ router = APIRouter(prefix="/staff/payroll", tags=["Staff"])
 PAYROLL_SORT_FIELDS = {"staff_name", "month", "year", "gross_salary", "net_salary", "created_at"}
 
 MONTH_ABBR = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
-
-def _apply_branch_scope(flt: dict, current_user: dict, branch_id: str | None):
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        flt["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        flt["branch_id"] = branch_id
-
 
 # ── List ──────────────────────────────────────────────────────────────────────
 
@@ -48,7 +39,7 @@ async def list_payroll(
     db  = get_db()
     flt: dict = {}
 
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
 
     if staff_id:            flt["staff_id"] = staff_id
     if month is not None:   flt["month"]    = month
@@ -85,7 +76,7 @@ async def export_payroll(
     db  = get_db()
     flt: dict = {}
 
-    _apply_branch_scope(flt, current_user, branch_id)
+    apply_branch_filter(flt, current_user, branch_id)
 
     if staff_id:            flt["staff_id"] = staff_id
     if month is not None:   flt["month"]    = month
@@ -147,11 +138,14 @@ async def generate_payroll(
     total_deductions = sum(d.amount for d in payload.deductions)
     net_salary       = gross_salary - total_deductions
 
+    branch_id = enforce_branch_on_create(payload.branch_id, current_user)
+
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
     data   = {
         "_id":              doc_id,
         **payload.model_dump(),
+        "branch_id":        branch_id,
         "staff_name":       staff_name,
         "basic_salary":     basic_salary,
         "overtime_pay":     overtime_pay,
@@ -186,6 +180,7 @@ async def mark_as_paid(
     doc = db[Collections.PAYROLL].find_one({"_id": payroll_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Payroll record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc.get("is_paid"):
         raise HTTPException(status_code=400, detail="Payroll record is already marked as paid")
 

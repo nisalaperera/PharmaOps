@@ -12,6 +12,7 @@ import { Input }        from "@/components/ui/Input";
 import { Autocomplete } from "@/components/ui/Autocomplete";
 import { apiGet, apiPost, apiPatch } from "@/lib/api-client";
 import { showToast }                 from "@/lib/toast";
+import { formatAmount }              from "@/lib/utils";
 import { useAuth }                   from "@/hooks/useAuth";
 import { PURCHASE_INVOICE_STATUS_OPTIONS } from "@/lib/constants";
 import { purchaseInvoiceSchema, type PurchaseInvoiceValues } from "../schemas";
@@ -31,10 +32,6 @@ const EMPTY_ITEM = {
   expiry_date: "", unit_quantity: 1, free_quantity: 0, discount: 0, unit_price: 0, selling_price: 0,
 };
 const EMPTY_RETURN = { product_id: "", product_name: "", batch_number: "", quantity: 1, unit_price: 0 };
-
-function lkr(n: number): string {
-  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: PurchaseInvoiceModalProps) {
   const { user, permissions } = useAuth();
@@ -329,7 +326,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
                       <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.discount`, { valueAsNumber: true })} />
                       <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.unit_price`, { valueAsNumber: true })} error={errs?.unit_price?.message} />
                       <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.selling_price`, { valueAsNumber: true })} />
-                      <div className="h-9 flex items-center justify-end px-2 rounded-md text-sm tabular-nums" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{lkr(line)}</div>
+                      <div className="h-9 flex items-center justify-end px-2 rounded-md text-sm tabular-nums" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{formatAmount(line)}</div>
                       <div className="flex items-center justify-center h-9">
                         <button type="button" onClick={() => itemsArray.remove(index)} className="p-1 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
@@ -384,7 +381,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
                     <Input placeholder="Batch" {...form.register(`return_items.${index}.batch_number`)} />
                     <Input type="number" min={1} {...form.register(`return_items.${index}.quantity`, { valueAsNumber: true })} error={errs?.quantity?.message} />
                     <Input type="number" min={0} step="0.01" {...form.register(`return_items.${index}.unit_price`, { valueAsNumber: true })} error={errs?.unit_price?.message} />
-                    <div className="h-9 flex items-center justify-end px-2 rounded-md text-sm tabular-nums" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{lkr(line)}</div>
+                    <div className="h-9 flex items-center justify-end px-2 rounded-md text-sm tabular-nums" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{formatAmount(line)}</div>
                     <div className="flex items-center justify-center h-9">
                       <button type="button" onClick={() => retsArray.remove(index)} className="p-1 rounded text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
@@ -404,9 +401,9 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
 
         {/* ── Summary ────────────────────────────────────────────────────────── */}
         <div className="flex flex-col items-end gap-1 pt-3 border-t text-sm" style={{ borderColor: "var(--color-border)" }}>
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Total:</span><span className="font-semibold tabular-nums w-32 text-right" style={{ color: "var(--color-text)" }}>{lkr(totalAmount)}</span></div>
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Return:</span><span className="font-semibold tabular-nums w-32 text-right" style={{ color: "var(--color-text)" }}>{lkr(returnAmount)}</span></div>
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Net Payable:</span><span className="font-bold tabular-nums w-32 text-right text-base text-primary-500">{lkr(netAmount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Total:</span><span className="font-semibold tabular-nums w-32 text-right" style={{ color: "var(--color-text)" }}>{formatAmount(totalAmount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Return:</span><span className="font-semibold tabular-nums w-32 text-right" style={{ color: "var(--color-text)" }}>{formatAmount(returnAmount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Net Payable:</span><span className="font-bold tabular-nums w-32 text-right text-base text-primary-500">{formatAmount(netAmount)}</span></div>
         </div>
 
         <div>

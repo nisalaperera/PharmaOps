@@ -10,8 +10,9 @@ import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 import { Button } from "@/components/ui/Button";
 import { Badge }  from "@/components/ui/Badge";
 import { useAuth } from "@/hooks/useAuth";
+import { useBranch } from "@/hooks/useBranch";
 import { apiGet, downloadBlob } from "@/lib/api-client";
-import { daysUntilExpiry, cn } from "@/lib/utils";
+import { daysUntilExpiry, cn, formatAmount, formatQuantity } from "@/lib/utils";
 import type {
   SalesSummaryReport, StockValuationReport, StockValuationItem,
   ExpiryReport, ExpiryItem, Branch, PaginatedResponse,
@@ -218,9 +219,9 @@ function exportExpiryCsv(items: ExpiryItem[], branchNameMap: Record<string, stri
 
 export default function ReportsPage() {
   const { permissions } = useAuth();
+  const { activeBranchId } = useBranch();
 
   const [activeTab,     setActiveTab]     = useState<ReportTab>("sales-summary");
-  const [branchFilter,  setBranchFilter]  = useState("");
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
   const [daysThreshold, setDaysThreshold] = useState(30);
@@ -239,7 +240,7 @@ export default function ReportsPage() {
   // ─── Sales Summary query ───────────────────────────────────────────────────
 
   const salesParams: Record<string, string> = {};
-  if (branchFilter) salesParams.branch_id = branchFilter;
+  if (activeBranchId) salesParams.branch_id = activeBranchId;
   if (dateFrom)     salesParams.date_from  = dateFrom;
   if (dateTo)       salesParams.date_to    = dateTo;
 
@@ -249,7 +250,7 @@ export default function ReportsPage() {
     isFetching: salesFetching,
     refetch:    refetchSales,
   } = useQuery<SalesSummaryReport>({
-    queryKey:  ["report-sales", branchFilter, dateFrom, dateTo],
+    queryKey:  ["report-sales", activeBranchId, dateFrom, dateTo],
     queryFn:   () => apiGet<SalesSummaryReport>("/reports/sales-summary", salesParams),
     enabled:   activeTab === "sales-summary",
     staleTime: 2 * 60 * 1000,
@@ -258,7 +259,7 @@ export default function ReportsPage() {
   // ─── Stock Valuation query ─────────────────────────────────────────────────
 
   const stockParams: Record<string, string> = {};
-  if (branchFilter) stockParams.branch_id = branchFilter;
+  if (activeBranchId) stockParams.branch_id = activeBranchId;
 
   const {
     data:       stockData,
@@ -266,7 +267,7 @@ export default function ReportsPage() {
     isFetching: stockFetching,
     refetch:    refetchStock,
   } = useQuery<StockValuationReport>({
-    queryKey:  ["report-stock", branchFilter],
+    queryKey:  ["report-stock", activeBranchId],
     queryFn:   () => apiGet<StockValuationReport>("/reports/stock-valuation", stockParams),
     enabled:   activeTab === "stock-valuation",
     staleTime: 2 * 60 * 1000,
@@ -275,7 +276,7 @@ export default function ReportsPage() {
   // ─── Expiry Report query ───────────────────────────────────────────────────
 
   const expiryParams: Record<string, string | number> = { days_threshold: daysThreshold };
-  if (branchFilter) expiryParams.branch_id = branchFilter;
+  if (activeBranchId) expiryParams.branch_id = activeBranchId;
 
   const {
     data:       expiryData,
@@ -283,7 +284,7 @@ export default function ReportsPage() {
     isFetching: expiryFetching,
     refetch:    refetchExpiry,
   } = useQuery<ExpiryReport>({
-    queryKey:  ["report-expiry", branchFilter, daysThreshold],
+    queryKey:  ["report-expiry", activeBranchId, daysThreshold],
     queryFn:   () => apiGet<ExpiryReport>("/reports/expiry-report", expiryParams),
     enabled:   activeTab === "expiry-report",
     staleTime: 2 * 60 * 1000,
@@ -395,23 +396,6 @@ export default function ReportsPage() {
         className="flex flex-wrap items-end gap-3 px-4 py-3 rounded-2xl"
         style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)" }}
       >
-        {/* Branch — org-level only */}
-        {permissions?.isOrgLevel && allBranches.length > 0 && (
-          <div>
-            <label className="form-label text-xs mb-1">Branch</label>
-            <select
-              value={branchFilter}
-              onChange={(e) => setBranchFilter(e.target.value)}
-              className="form-select w-auto"
-            >
-              <option value="">All Branches</option>
-              {allBranches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {/* Sales Summary — date filters */}
         {activeTab === "sales-summary" && (
           <>
@@ -488,18 +472,18 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard
               label="Total Revenue"
-              value={salesLoading ? "—" : salesData ? salesData.total_amount.toFixed(2) : "—"}
+              value={salesLoading ? "—" : salesData ? formatAmount(salesData.total_amount) : "—"}
               icon={ShoppingCart}
               variant="success"
             />
             <StatCard
               label="Transactions"
-              value={salesLoading ? "—" : salesData ? salesData.sale_count.toLocaleString() : "—"}
+              value={salesLoading ? "—" : salesData ? formatQuantity(salesData.sale_count) : "—"}
               icon={Archive}
             />
             <StatCard
               label="Average Sale"
-              value={salesLoading ? "—" : salesData ? avgSale.toFixed(2) : "—"}
+              value={salesLoading ? "—" : salesData ? formatAmount(avgSale) : "—"}
               sub="per transaction"
             />
           </div>
@@ -532,7 +516,7 @@ export default function ReportsPage() {
                     return (
                       <tr key={method} className="border-t" style={{ borderColor: "var(--color-border)" }}>
                         <Td>{PAYMENT_LABELS[method] ?? method}</Td>
-                        <Td right>{amount.toFixed(2)}</Td>
+                        <Td right>{formatAmount(amount)}</Td>
                         <Td right muted>
                           <div className="flex items-center justify-end gap-2">
                             <div className="w-20 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--color-surface-2)" }}>
@@ -558,17 +542,17 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard
               label="Total Inventory Value"
-              value={stockLoading ? "—" : stockData ? stockData.total_value.toFixed(2) : "—"}
+              value={stockLoading ? "—" : stockData ? formatAmount(stockData.total_value) : "—"}
               icon={Archive}
               variant="success"
             />
             <StatCard
               label="Products in Stock"
-              value={stockLoading ? "—" : stockData ? stockData.item_count.toLocaleString() : "—"}
+              value={stockLoading ? "—" : stockData ? formatQuantity(stockData.item_count) : "—"}
             />
             <StatCard
               label="Low Stock Items"
-              value={stockLoading ? "—" : stockData ? stockData.low_stock_count.toLocaleString() : "—"}
+              value={stockLoading ? "—" : stockData ? formatQuantity(stockData.low_stock_count) : "—"}
               variant={stockData && stockData.low_stock_count > 0 ? "warning" : "default"}
             />
           </div>
@@ -612,8 +596,8 @@ export default function ReportsPage() {
                       {permissions?.isOrgLevel && (
                         <Td muted>{branchNameMap[item.branch_id] ?? item.branch_id}</Td>
                       )}
-                      <Td right muted>{item.total_qty.toLocaleString()}</Td>
-                      <Td right>{item.value.toFixed(2)}</Td>
+                      <Td right muted>{formatQuantity(item.total_qty)}</Td>
+                      <Td right>{formatAmount(item.value)}</Td>
                     </tr>
                   ))
                 )}
@@ -630,7 +614,7 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard
               label={`Expiring within ${daysThreshold} days`}
-              value={expiryLoading ? "—" : expiryData ? expiryData.expiring_count.toLocaleString() : "—"}
+              value={expiryLoading ? "—" : expiryData ? formatQuantity(expiryData.expiring_count) : "—"}
               icon={AlertTriangle}
               variant={expiryData && expiryData.expiring_count > 0 ? "warning" : "default"}
             />
@@ -684,7 +668,7 @@ export default function ReportsPage() {
                         <Td right>
                           <ExpiryBadge days={days} />
                         </Td>
-                        <Td right muted>{item.quantity.toLocaleString()}</Td>
+                        <Td right muted>{formatQuantity(item.quantity)}</Td>
                       </tr>
                     );
                   })

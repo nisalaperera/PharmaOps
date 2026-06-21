@@ -9,6 +9,7 @@ import { Modal }           from "@/components/ui/Modal";
 import { Button }          from "@/components/ui/Button";
 import { Input }           from "@/components/ui/Input";
 import { apiGet, apiPost } from "@/lib/api-client";
+import { formatAmount }    from "@/lib/utils";
 import { showToast }       from "@/lib/toast";
 import { FUND_SOURCE_TYPE_OPTIONS } from "@/lib/constants";
 import {
@@ -94,11 +95,11 @@ export function FundTransferModal({ isOpen, onClose }: FundTransferModalProps) {
     if (!watchedFromId) return null;
     if (watchedFromType === "CASH_REGISTRY") {
       const registry = registries.find((r) => r.id === watchedFromId);
-      return registry ? `LKR ${registry.current_balance.toFixed(2)}` : null;
+      return registry ? `LKR ${formatAmount(registry.current_balance)}` : null;
     }
     if (watchedFromType === "BANK_ACCOUNT") {
       const account = bankAccounts.find((a) => a.id === watchedFromId);
-      return account ? `LKR ${account.current_balance.toFixed(2)}` : null;
+      return account ? `LKR ${formatAmount(account.current_balance)}` : null;
     }
     return null;
   }

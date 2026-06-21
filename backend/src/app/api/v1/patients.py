@@ -16,8 +16,9 @@ PATIENT_SORT_FIELDS = {"name", "relationship", "created_at"}
 
 @router.get("", response_model=PaginatedResponse[PatientResponse])
 async def list_patients(
-    customer_id: str | None = Query(default=None),
-    search:      str | None = Query(default=None),
+    customer_id: str | None  = Query(default=None),
+    is_active:   bool | None = Query(default=None),
+    search:      str | None  = Query(default=None),
     page:        int        = Query(default=1, ge=1),
     page_size:   int        = Query(default=20, ge=1, le=100),
     sort_by:     str | None = Query(default="name"),
@@ -28,6 +29,8 @@ async def list_patients(
     flt: dict = {}
     if customer_id:
         flt["customer_id"] = customer_id
+    if is_active is not None:
+        flt["is_active"] = is_active
     if search:
         flt.update(build_search_filter(search, ["name"]))
 
@@ -65,6 +68,7 @@ async def create_patient(
         "_id": doc_id,
         **payload.model_dump(),
         "customer_name": customer_name,
+        "is_active": True,
         "created_at": now,
         "updated_at": now,
         **audit_create_fields(current_user),
@@ -115,3 +119,26 @@ async def update_patient(
         resource="patient", resource_id=patient_id,
     )
     return PatientResponse(**doc_to_dict(db[Collections.PATIENTS].find_one({"_id": patient_id})))
+
+
+# ── Soft Delete ──────────────────────────────────────────────────────────────
+
+@router.delete("/{patient_id}", status_code=204)
+async def delete_patient(
+    patient_id:   str,
+    current_user: dict = Depends(get_current_user),
+):
+    db = get_db()
+    if not db[Collections.PATIENTS].find_one({"_id": patient_id}):
+        raise HTTPException(status_code=404, detail="Patient not found")
+
+    now = datetime.now(timezone.utc).isoformat()
+    db[Collections.PATIENTS].update_one(
+        {"_id": patient_id},
+        {"$set": {"is_active": False, "updated_at": now, **audit_update_fields(current_user)}},
+    )
+    await log_audit(
+        user_id=current_user["id"], user_email=current_user["email"],
+        user_role=current_user["role"], action="SOFT_DELETE",
+        resource="patient", resource_id=patient_id,
+    )

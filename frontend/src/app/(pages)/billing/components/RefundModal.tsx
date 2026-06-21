@@ -8,8 +8,9 @@ import { DollarSign } from "lucide-react";
 import { Modal }    from "@/components/ui/Modal";
 import { Button }   from "@/components/ui/Button";
 import { Input, Select } from "@/components/ui/Input";
-import { showToast } from "@/lib/toast";
-import { apiPatch }  from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { apiPatch }     from "@/lib/api-client";
+import { formatAmount } from "@/lib/utils";
 import { refundSchema, type RefundValues } from "../schemas";
 import type { Sale } from "@/types";
 
@@ -79,7 +80,7 @@ export function RefundModal({ sale, onClose }: RefundModalProps) {
           <div className="flex justify-between">
             <span style={{ color: "var(--color-text-muted)" }}>Sale Total</span>
             <span className="tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>
-              {sale.total_amount.toFixed(2)}
+              {formatAmount(sale.total_amount)}
             </span>
           </div>
           {sale.customer_name && (

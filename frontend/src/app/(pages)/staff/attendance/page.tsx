@@ -18,6 +18,7 @@ import { Pagination }             from "@/components/common/Pagination";
 import { SearchBar }              from "@/components/common/SearchBar";
 import { Button }                 from "@/components/ui/Button";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { cn, formatTime }           from "@/lib/utils";
@@ -197,10 +198,10 @@ const DEFAULT_TAG: DateRangeTagId = "last7";
 
 export default function AttendancePage() {
   const { user: me, permissions } = useAuth();
+  const { activeBranchId } = useBranch();
   const canManage = permissions?.isAdmin || permissions?.isManager || permissions?.isBranchAdmin;
 
   // — Filters
-  const [branchFilter,   setBranchFilter]   = useState("");
   const [staffFilter,    setStaffFilter]    = useState("");
   const [dateFromFilter, setDateFromFilter] = useState("");
   const [dateToFilter,   setDateToFilter]   = useState("");
@@ -247,7 +248,7 @@ export default function AttendancePage() {
   }
 
   const filters = {
-    ...(branchFilter   && { branch_id: branchFilter }),
+    ...(activeBranchId && { branch_id: activeBranchId }),
     ...(staffFilter    && { staff_id:  staffFilter }),
     ...(dateFromFilter && { date_from: dateFromFilter }),
     ...(dateToFilter   && { date_to:   dateToFilter }),
@@ -256,7 +257,7 @@ export default function AttendancePage() {
   // ─── Data ─────────────────────────────────────────────────────────────────────
 
   // All four filters are mandatory before loading data
-  const branchReady    = !permissions?.isOrgLevel || !!branchFilter;
+  const branchReady    = !permissions?.isOrgLevel || !!activeBranchId;
   const attendanceEnabled = branchReady && !!staffFilter && !!dateFromFilter && !!dateToFilter;
 
   const { data, isLoading, isFetching } = useQuery<PaginatedResponse<Attendance>>({
@@ -283,7 +284,7 @@ export default function AttendancePage() {
   const branchNameMap = Object.fromEntries(allBranches.map((b) => [b.id, b.name]));
 
   // Staff list filtered by branch — uses the dedicated by-branch endpoint (unpaginated)
-  const staffQueryBranchId = permissions?.isOrgLevel ? branchFilter : (me?.branchId ?? "");
+  const staffQueryBranchId = permissions?.isOrgLevel ? (activeBranchId ?? "") : (me?.branchId ?? "");
   const { data: staffList = [] } = useQuery<Staff[]>({
     queryKey:  ["staff-by-branch", staffQueryBranchId],
     queryFn:   () => apiGet<Staff[]>(`/staff/by-branch/${staffQueryBranchId}`),
@@ -297,7 +298,7 @@ export default function AttendancePage() {
 
   const filteredTotalMinutes  = totalsData?.total_minutes ?? 0;
 
-  const currentBranchName = branchFilter ? (branchNameMap[branchFilter] ?? undefined) : undefined;
+  const currentBranchName = activeBranchId ? (branchNameMap[activeBranchId] ?? undefined) : undefined;
 
   // ─── Selection ────────────────────────────────────────────────────────────────
 
@@ -327,7 +328,7 @@ export default function AttendancePage() {
       setIsExportingCsv(true);
       try {
         const exportParams: Record<string, unknown> = {};
-        if (branchFilter)   exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (staffFilter)    exportParams.staff_id  = staffFilter;
         if (dateFromFilter) exportParams.date_from = dateFromFilter;
         if (dateToFilter)   exportParams.date_to   = dateToFilter;
@@ -474,29 +475,6 @@ export default function AttendancePage() {
         {/* Filter controls — order: Branch, Staff Member, From, To */}
         <div className="flex flex-wrap items-end gap-3">
 
-          {/* Branch — org-level only */}
-          {permissions?.isOrgLevel && allBranches.length > 0 && (
-            <div>
-              <label className="form-label text-xs mb-1">
-                Branch <span className="text-danger-500">*</span>
-              </label>
-              <select
-                value={branchFilter}
-                onChange={(e) => {
-                  setBranchFilter(e.target.value);
-                  setStaffFilter("");
-                  goToPage(1);
-                }}
-                className="form-select w-auto"
-              >
-                <option value="">Select Branch…</option>
-                {allBranches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Staff Member */}
           <div>
             <label className="form-label text-xs mb-1">
@@ -551,10 +529,10 @@ export default function AttendancePage() {
           </div>
 
           {/* Clear optional selections */}
-          {(branchFilter || staffFilter) && (
+          {staffFilter && (
             <button
               type="button"
-              onClick={() => { setBranchFilter(""); setStaffFilter(""); goToPage(1); }}
+              onClick={() => { setStaffFilter(""); goToPage(1); }}
               className="text-xs px-3 py-1.5 rounded-lg transition-colors"
               style={{ color: "var(--color-text-muted)", background: "var(--color-surface-2)" }}
             >

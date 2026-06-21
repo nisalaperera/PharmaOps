@@ -6,10 +6,21 @@ from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.models.stock_transfer import StockTransferCreate, StockTransferResponse
 from app.models.common import PaginatedResponse
 from app.utils.notify import notify_branch_users
+from app.utils.branch_scope import BRANCH_LEVEL_ROLES, enforce_branch_on_create
+from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.sequences import generate_document_number, get_branch_code
 
 router = APIRouter(prefix="/inventory/stock-transfers", tags=["Inventory"])
 
 VALID_SORT_FIELDS = {"created_at", "status", "source_branch_name", "destination_branch_name"}
+
+
+def _ensure_transfer_branch_access(transfer: dict, current_user: dict) -> None:
+    if current_user["role"] not in BRANCH_LEVEL_ROLES:
+        return
+    user_branch = current_user["branch_id"]
+    if transfer.get("source_branch_id") != user_branch and transfer.get("destination_branch_id") != user_branch:
+        raise HTTPException(status_code=404, detail="Not found")
 
 
 def _resolve_transfer(data: dict, db) -> dict:
@@ -45,6 +56,13 @@ async def list_transfers(
     db     = get_db()
     filt:  dict = {}
 
+    if current_user["role"] in BRANCH_LEVEL_ROLES:
+        user_branch = current_user["branch_id"]
+        filt["$or"] = [
+            {"source_branch_id": user_branch},
+            {"destination_branch_id": user_branch},
+        ]
+
     if status:
         filt["status"] = status
 
@@ -76,10 +94,16 @@ async def create_transfer(
     db     = get_db()
     now    = datetime.now(timezone.utc).isoformat()
     doc_id = new_id()
+    payload.source_branch_id = enforce_branch_on_create(payload.source_branch_id, current_user)
+
+    branch_code     = get_branch_code(db, payload.source_branch_id)
+    transfer_number = generate_document_number(db, branch_code, "ST")
+
     data   = {
-        "_id": doc_id, **payload.model_dump(),
+        "_id": doc_id, "transfer_number": transfer_number, **payload.model_dump(),
         "status": "PENDING", "initiated_by": current_user["id"],
         "created_at": now, "updated_at": now,
+        **audit_create_fields(current_user),
     }
     _resolve_transfer(data, db)
     db[Collections.STOCK_TRANSFERS].insert_one(data)
@@ -107,12 +131,13 @@ async def confirm_transfer(
     existing = db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Transfer not found")
+    _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
     if existing["status"] != "PENDING":
         raise HTTPException(status_code=400, detail="Only PENDING transfers can be confirmed")
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.STOCK_TRANSFERS].update_one(
         {"_id": transfer_id},
-        {"$set": {"status": "CONFIRMED", "confirmed_by": current_user["id"], "confirmed_at": now, "updated_at": now}},
+        {"$set": {"status": "CONFIRMED", "confirmed_by": current_user["id"], "confirmed_at": now, "updated_at": now, **audit_update_fields(current_user)}},
     )
     return StockTransferResponse(**_resolve_transfer(doc_to_dict(db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})), db))
 
@@ -126,11 +151,12 @@ async def reject_transfer(
     existing = db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Transfer not found")
+    _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
     if existing["status"] != "PENDING":
         raise HTTPException(status_code=400, detail="Only PENDING transfers can be rejected")
     db[Collections.STOCK_TRANSFERS].update_one(
         {"_id": transfer_id},
-        {"$set": {"status": "REJECTED", "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"status": "REJECTED", "updated_at": datetime.now(timezone.utc).isoformat(), **audit_update_fields(current_user)}},
     )
     return StockTransferResponse(**_resolve_transfer(doc_to_dict(db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})), db))
 
@@ -144,10 +170,11 @@ async def cancel_transfer(
     existing = db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})
     if not existing:
         raise HTTPException(status_code=404, detail="Transfer not found")
+    _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
     if existing["status"] != "PENDING":
         raise HTTPException(status_code=400, detail="Only PENDING transfers can be cancelled")
     db[Collections.STOCK_TRANSFERS].update_one(
         {"_id": transfer_id},
-        {"$set": {"status": "CANCELLED", "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"status": "CANCELLED", "updated_at": datetime.now(timezone.utc).isoformat(), **audit_update_fields(current_user)}},
     )
     return StockTransferResponse(**_resolve_transfer(doc_to_dict(db[Collections.STOCK_TRANSFERS].find_one({"_id": transfer_id})), db))

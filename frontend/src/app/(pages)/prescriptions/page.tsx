@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { ClipboardList, Plus, SlidersHorizontal, Eye, XCircle, CheckCircle2, FileDown, FileText } from "lucide-react";
+import { ClipboardList, Plus, SlidersHorizontal, Eye, XCircle, CheckCircle2, FileDown, FileText, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -117,6 +117,7 @@ export default function PrescriptionsPage() {
   // ── Row selection
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
+  const [confirmBulkDeactivateOpen, setConfirmBulkDeactivateOpen] = useState(false);
 
   // ── Pagination
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
@@ -224,6 +225,29 @@ export default function PrescriptionsPage() {
     const branchName = filterBranch ? branchNameMap[filterBranch] : undefined;
     exportSelectedPdf(selectedItems, branchName);
   }
+
+  // ── Bulk deactivate ─────────────────────────────────────────────────────────
+
+  const deactivatableSelected = selectedItems.filter((rx) => rx.is_active);
+
+  const bulkDeactivateMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(deactivatableSelected.map((rx) => apiPatch(`/prescriptions/${rx.id}`, { is_active: false })));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["prescriptions"] });
+      showToast(
+        "success",
+        "Prescriptions Deactivated",
+        `${deactivatableSelected.length} prescription${deactivatableSelected.length !== 1 ? "s" : ""} deactivated successfully.`,
+      );
+      clearSelection();
+      setConfirmBulkDeactivateOpen(false);
+    },
+    onError: (err: { message?: string }) => {
+      showToast("error", "Deactivation Failed", err?.message ?? "Could not deactivate some prescriptions. Please try again.");
+    },
+  });
 
   // ── Column definitions
   const columns: Column<Prescription>[] = [
@@ -486,6 +510,16 @@ export default function PrescriptionsPage() {
               {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
             </p>
             <div className="flex items-center gap-2">
+              {canToggle && !allPagesSelected && deactivatableSelected.length > 0 && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={() => setConfirmBulkDeactivateOpen(true)}
+                >
+                  Deactivate ({deactivatableSelected.length})
+                </Button>
+              )}
               <Button
                 variant="outline" size="sm"
                 leftIcon={<FileDown className="w-3.5 h-3.5" />}
@@ -555,6 +589,17 @@ export default function PrescriptionsPage() {
         variant={isDeactivating ? "danger" : "primary"}
         onConfirm={() => confirmPrescription && toggleMutation.mutate(confirmPrescription)}
         isLoading={toggleMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmBulkDeactivateOpen}
+        onClose={() => setConfirmBulkDeactivateOpen(false)}
+        title="Deactivate Prescriptions"
+        body={`Are you sure you want to deactivate ${deactivatableSelected.length} active prescription${deactivatableSelected.length !== 1 ? "s" : ""}? They will no longer be available for dispensing.`}
+        confirmLabel="Deactivate"
+        variant="danger"
+        onConfirm={() => bulkDeactivateMutation.mutate()}
+        isLoading={bulkDeactivateMutation.isPending}
       />
     </div>
   );

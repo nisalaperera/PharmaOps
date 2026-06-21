@@ -4,7 +4,7 @@ import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   ShoppingCart, Plus, Eye, Pencil, SlidersHorizontal,
-  FileDown, FileText, Send, CheckCircle2, Ban, Receipt,
+  FileDown, FileText, Send, CheckCircle2, Ban, Receipt, Trash2,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -17,9 +17,11 @@ import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
 import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPost, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
+import { formatAmount }           from "@/lib/utils";
 import { PO_STATUS_FILTER_OPTIONS } from "@/lib/constants";
 import { PO_STATUS_LABEL, PO_STATUS_VARIANT } from "@/lib/badges";
 import APP_CONFIG                 from "@/lib/config";
@@ -138,8 +140,9 @@ export default function PurchaseOrdersPage() {
   const canManage   = permissions?.can("BRANCH_USER")    ?? false;
   const canApprove  = permissions?.can("BRANCH_MANAGER") ?? false;
 
+  const { activeBranchId } = useBranch();
+
   const [statusFilter, setStatusFilter]   = useState("");
-  const [branchFilter, setBranchFilter]   = useState("");
   const [filterVisible, setFilterVisible] = useState(false);
 
   const [modalOpen,     setModalOpen]     = useState(false);
@@ -151,19 +154,20 @@ export default function PurchaseOrdersPage() {
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
+  const [confirmBulkCancelOpen, setConfirmBulkCancelOpen] = useState(false);
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "created_at", initialSortDirection: "desc" });
 
   const filters = {
-    ...(statusFilter && { status:    statusFilter }),
-    ...(branchFilter && { branch_id: branchFilter }),
+    ...(statusFilter    && { status:    statusFilter }),
+    ...(activeBranchId  && { branch_id: activeBranchId }),
   };
 
-  const hasActiveFilters  = statusFilter !== "" || branchFilter !== "";
-  const activeFilterCount = (statusFilter ? 1 : 0) + (branchFilter ? 1 : 0);
+  const hasActiveFilters  = statusFilter !== "";
+  const activeFilterCount = (statusFilter ? 1 : 0);
 
-  function clearFilters() { setStatusFilter(""); setBranchFilter(""); goToPage(1); }
+  function clearFilters() { setStatusFilter(""); goToPage(1); }
   function hideFilters()  { clearFilters(); setFilterVisible(false); }
 
   const queryClient = useQueryClient();
@@ -224,7 +228,7 @@ export default function PurchaseOrdersPage() {
       try {
         const exportParams: Record<string, unknown> = {};
         if (statusFilter) exportParams.status    = statusFilter;
-        if (branchFilter) exportParams.branch_id = branchFilter;
+        if (activeBranchId) exportParams.branch_id = activeBranchId;
         if (search)       exportParams.search    = search;
         const blob = await apiDownloadFile("/purchases/orders/export", exportParams);
         downloadBlob(blob, `purchase_orders_${exportDateStamp()}.csv`);
@@ -241,6 +245,29 @@ export default function PurchaseOrdersPage() {
   async function handleExportPdf() {
     await exportSelectedPdf(selectedItems, branchNameMap);
   }
+
+  // ─── Bulk cancel ──────────────────────────────────────────────────────────────
+
+  const cancelableSelected = selectedItems.filter((po) => po.status === "DRAFT");
+
+  const bulkCancelMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(cancelableSelected.map((po) => apiPost(`/purchases/orders/${po.id}/cancel`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      showToast(
+        "success",
+        "Orders Cancelled",
+        `${cancelableSelected.length} draft order${cancelableSelected.length !== 1 ? "s" : ""} cancelled successfully.`,
+      );
+      clearSelection();
+      setConfirmBulkCancelOpen(false);
+    },
+    onError: (err: { message?: string }) => {
+      showToast("error", "Cancel Failed", err?.message ?? "Could not cancel some orders. Please try again.");
+    },
+  });
 
   const columns: Column<PurchaseOrder>[] = [
     {
@@ -284,7 +311,7 @@ export default function PurchaseOrdersPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm font-semibold tabular-nums" style={{ color: "var(--color-text)" }}>
-          {row.total_amount.toFixed(2)}
+          {formatAmount(row.total_amount)}
         </span>
       ),
     },
@@ -430,12 +457,6 @@ export default function PurchaseOrdersPage() {
           {PO_STATUS_FILTER_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </select>
 
-        {permissions?.isOrgLevel && (
-          <select value={branchFilter} onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }} className="form-select w-auto">
-            <option value="">All Branches</option>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        )}
       </FilterBar>
 
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
@@ -488,6 +509,16 @@ export default function PurchaseOrdersPage() {
               {selectionCount} record{selectionCount !== 1 ? "s" : ""} selected
             </p>
             <div className="flex items-center gap-2">
+              {canManage && !allPagesSelected && cancelableSelected.length > 0 && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={() => setConfirmBulkCancelOpen(true)}
+                >
+                  Cancel ({cancelableSelected.length})
+                </Button>
+              )}
               <Button variant="outline" size="sm" leftIcon={<FileDown className="w-3.5 h-3.5" />} onClick={handleExportCsv} isLoading={isExportingCsv}>
                 Export CSV
               </Button>
@@ -536,6 +567,17 @@ export default function PurchaseOrdersPage() {
           isLoading={actionMutation.isPending}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmBulkCancelOpen}
+        onClose={() => setConfirmBulkCancelOpen(false)}
+        title="Cancel Draft Orders"
+        body={`Are you sure you want to cancel ${cancelableSelected.length} draft order${cancelableSelected.length !== 1 ? "s" : ""}? This action cannot be undone.`}
+        confirmLabel="Cancel Orders"
+        variant="danger"
+        onConfirm={() => bulkCancelMutation.mutate()}
+        isLoading={bulkCancelMutation.isPending}
+      />
     </div>
   );
 }

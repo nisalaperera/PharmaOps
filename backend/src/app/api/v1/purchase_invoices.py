@@ -6,6 +6,8 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import effective_branch_id, ensure_branch_access, enforce_branch_on_create, BRANCH_LEVEL_ROLES
+from app.utils.sequences import generate_document_number, get_branch_code
 from app.models.purchase_invoice import (
     PurchaseInvoiceCreate, PurchaseInvoiceUpdate, PurchaseInvoiceResponse,
     PurchasePaymentCreate, PurchasePaymentResponse,
@@ -14,17 +16,10 @@ from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/purchases", tags=["Purchase Invoices"])
 
-BRANCH_ROLES                = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
 PURCHASE_INVOICE_SORT_FIELDS = {
     "created_at", "updated_at", "invoice_date", "invoice_number",
     "supplier_name", "status", "payment_status", "total_amount", "net_amount",
 }
-
-
-def _branch_scope(current_user: dict, requested_branch_id: str | None) -> str | None:
-    if current_user["role"] in BRANCH_ROLES:
-        return current_user["branch_id"]
-    return requested_branch_id
 
 
 def _resolve_supplier(db, supplier_id: str, channel_id: str) -> tuple[str, str, int]:
@@ -65,21 +60,9 @@ def _compute_amounts(payload_dict: dict) -> tuple[list, list, float, float]:
     return items, return_items, total_amount, return_amount
 
 
-def _generate_invoice_number(db, invoice_date: str) -> str:
-    """MG/PI/yyyy/MM/dd/XX — XX is max+1 for that invoice date."""
-    date_part = invoice_date[:10]                     # yyyy-MM-dd
-    yyyy, mm, dd = date_part.split("-")
-    prefix = f"MG/PI/{yyyy}/{mm}/{dd}/"
-    existing = db[Collections.PURCHASE_INVOICES].find(
-        {"invoice_number": {"$regex": f"^{prefix.replace('/', chr(92) + '/')}"}},
-        {"invoice_number": 1},
-    )
-    max_seq = 0
-    for d in existing:
-        tail = d.get("invoice_number", "").rsplit("/", 1)[-1]
-        if tail.isdigit():
-            max_seq = max(max_seq, int(tail))
-    return f"{prefix}{max_seq + 1:02d}"
+def _generate_invoice_number(db, branch_id: str, invoice_date: str) -> str:
+    branch_code = get_branch_code(db, branch_id)
+    return generate_document_number(db, branch_code, "PI", ref_date=invoice_date)
 
 
 def _payment_status(net_amount: float, paid: float) -> str:
@@ -172,10 +155,10 @@ async def list_purchase_invoices(
     current_user:   dict = Depends(get_current_user),
 ):
     db  = get_db()
-    flt = {}
+    flt = {"is_active": {"$ne": False}}
 
-    effective_branch = _branch_scope(current_user, branch_id)
-    if effective_branch:  flt["branch_id"]      = effective_branch
+    bid = effective_branch_id(current_user, branch_id)
+    if bid:               flt["branch_id"]      = bid
     if status:            flt["status"]          = status
     if payment_status:    flt["payment_status"]  = payment_status
     if supplier_id:       flt["supplier_id"]     = supplier_id
@@ -212,8 +195,8 @@ async def export_purchase_invoices(
     db  = get_db()
     flt = {}
 
-    effective_branch = _branch_scope(current_user, branch_id)
-    if effective_branch:  flt["branch_id"]      = effective_branch
+    bid = effective_branch_id(current_user, branch_id)
+    if bid:               flt["branch_id"]      = bid
     if status:            flt["status"]          = status
     if payment_status:    flt["payment_status"]  = payment_status
     if search:            flt.update(build_search_filter(search, ["supplier_name", "invoice_number", "distributor_invoice_no"]))
@@ -255,6 +238,7 @@ async def get_purchase_invoice(
     doc = db[Collections.PURCHASE_INVOICES].find_one({"_id": invoice_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase invoice not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     return _serialize(doc)
 
 
@@ -266,9 +250,7 @@ async def create_purchase_invoice(
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
 
-    branch_id = _branch_scope(current_user, payload.branch_id) or payload.branch_id
-    if not branch_id:
-        raise HTTPException(status_code=400, detail="branch_id is required")
+    branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     supplier_name, channel_name, credit_term_days = _resolve_supplier(db, payload.supplier_id, payload.channel_id)
 
@@ -276,7 +258,7 @@ async def create_purchase_invoice(
     items, return_items, total_amount, return_amount = _compute_amounts(payload_dict)
     net_amount = round(total_amount - return_amount, 2)
 
-    invoice_number = _generate_invoice_number(db, payload.invoice_date)
+    invoice_number = _generate_invoice_number(db, branch_id, payload.invoice_date)
     doc_id         = new_id()
     data = {
         "_id":                      doc_id,
@@ -335,6 +317,7 @@ async def update_purchase_invoice(
     doc = db[Collections.PURCHASE_INVOICES].find_one({"_id": invoice_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase invoice not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] == "VERIFIED":
         raise HTTPException(status_code=400, detail="Verified invoices cannot be edited")
 
@@ -383,6 +366,7 @@ async def verify_purchase_invoice(
     doc = db[Collections.PURCHASE_INVOICES].find_one({"_id": invoice_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase invoice not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] == "VERIFIED":
         raise HTTPException(status_code=400, detail="Invoice is already verified")
 
@@ -418,15 +402,20 @@ async def delete_purchase_invoice(
     doc = db[Collections.PURCHASE_INVOICES].find_one({"_id": invoice_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Purchase invoice not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc["status"] == "VERIFIED":
         raise HTTPException(status_code=400, detail="Verified invoices cannot be deleted")
     if doc.get("paid_amount", 0) > 0:
         raise HTTPException(status_code=400, detail="Invoices with payments cannot be deleted")
 
-    db[Collections.PURCHASE_INVOICES].delete_one({"_id": invoice_id})
+    now = datetime.now(timezone.utc).isoformat()
+    db[Collections.PURCHASE_INVOICES].update_one(
+        {"_id": invoice_id},
+        {"$set": {"is_active": False, "updated_at": now, **audit_update_fields(current_user)}},
+    )
     await log_audit(
         user_id=current_user["id"], user_email=current_user["email"],
-        user_role=current_user["role"], action="DELETE",
+        user_role=current_user["role"], action="SOFT_DELETE",
         resource="purchase_invoice", resource_id=invoice_id,
     )
 

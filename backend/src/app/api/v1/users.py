@@ -12,6 +12,7 @@ from app.models.user import UserCreate, UserUpdate, UserPasswordReset, UserPassw
 from app.models.common import PaginatedResponse, paginate
 from app.utils.password import hash_password, verify_password
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -29,26 +30,22 @@ async def list_users(
     sort_dir:  str | None = Query(default="asc"),
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db     = get_db()
-    filter = {}
-
-    if current_user["role"] in ("BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"):
-        filter["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        filter["branch_id"] = branch_id
+    db  = get_db()
+    flt: dict = {}
+    apply_branch_filter(flt, current_user, branch_id)
 
     if role:
-        filter["role"] = role
+        flt["role"] = role
 
     if search:
-        filter.update(build_search_filter(search, ["full_name", "email"]))
+        flt.update(build_search_filter(search, ["full_name", "email"]))
 
     sort_field     = sort_by if sort_by in USER_SORT_FIELDS else "full_name"
     sort_direction = -1 if sort_dir == "desc" else 1
 
-    total = db[Collections.USERS].count_documents(filter)
+    total = db[Collections.USERS].count_documents(flt)
     skip  = (page - 1) * page_size
-    docs  = db[Collections.USERS].find(filter, {"password_hash": 0}).sort(sort_field, sort_direction).skip(skip).limit(page_size)
+    docs  = db[Collections.USERS].find(flt, {"password_hash": 0}).sort(sort_field, sort_direction).skip(skip).limit(page_size)
     users = [UserResponse(**doc_to_dict(d)) for d in docs]
 
     return PaginatedResponse[UserResponse](
@@ -66,6 +63,9 @@ async def create_user(
 
     if db[Collections.USERS].find_one({"email": payload.email.lower()}):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    if payload.branch_id:
+        payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     now     = datetime.now(timezone.utc).isoformat()
     user_id = new_id()
@@ -99,20 +99,16 @@ async def export_users(
     search:    str | None = Query(default=None),
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db     = get_db()
-    filter = {}
-
-    if current_user["role"] in ("BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"):
-        filter["branch_id"] = current_user["branch_id"]
-    elif branch_id:
-        filter["branch_id"] = branch_id
+    db  = get_db()
+    flt: dict = {}
+    apply_branch_filter(flt, current_user, branch_id)
 
     if role:
-        filter["role"] = role
+        flt["role"] = role
     if search:
-        filter.update(build_search_filter(search, ["full_name", "email"]))
+        flt.update(build_search_filter(search, ["full_name", "email"]))
 
-    docs  = db[Collections.USERS].find(filter, {"password_hash": 0}).sort("full_name", 1)
+    docs  = db[Collections.USERS].find(flt, {"password_hash": 0}).sort("full_name", 1)
     users = [doc_to_dict(d) for d in docs]
 
     branch_ids = list({u.get("branch_id") for u in users if u.get("branch_id")})
@@ -289,7 +285,9 @@ async def get_user(user_id: str, current_user: dict = Depends(get_current_user))
     doc = db[Collections.USERS].find_one({"_id": user_id}, {"password_hash": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserResponse(**doc_to_dict(doc))
+    user = doc_to_dict(doc)
+    ensure_branch_access(user, current_user)
+    return UserResponse(**user)
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
@@ -298,9 +296,11 @@ async def update_user(
     payload:      UserUpdate,
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db = get_db()
-    if not db[Collections.USERS].find_one({"_id": user_id}):
+    db  = get_db()
+    doc = db[Collections.USERS].find_one({"_id": user_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="User not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -323,9 +323,11 @@ async def reset_user_password(
     payload:      UserPasswordReset,
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db = get_db()
-    if not db[Collections.USERS].find_one({"_id": user_id}):
+    db  = get_db()
+    doc = db[Collections.USERS].find_one({"_id": user_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="User not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     db[Collections.USERS].update_one(
         {"_id": user_id},
@@ -380,9 +382,11 @@ async def delete_user(
     user_id:      str,
     current_user: dict = Depends(require_min_role("BRANCH_ADMIN")),
 ):
-    db = get_db()
-    if not db[Collections.USERS].find_one({"_id": user_id}):
+    db  = get_db()
+    doc = db[Collections.USERS].find_one({"_id": user_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="User not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     db[Collections.USERS].update_one(
         {"_id": user_id},

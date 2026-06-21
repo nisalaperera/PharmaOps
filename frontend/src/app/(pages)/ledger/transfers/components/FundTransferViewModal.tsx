@@ -2,7 +2,7 @@
 
 import { Modal }          from "@/components/ui/Modal";
 import { Badge }          from "@/components/ui/Badge";
-import { formatDateTime } from "@/lib/utils";
+import { formatAmount, formatDateTime } from "@/lib/utils";
 import { FUND_SOURCE_TYPE_LABEL } from "@/lib/constants";
 import type { FundTransfer } from "@/types";
 
@@ -27,7 +27,7 @@ export function FundTransferViewModal({ isOpen, onClose, transfer }: FundTransfe
           Transfer Amount
         </p>
         <p className="text-2xl font-bold tabular-nums" style={{ color: "var(--color-text)" }}>
-          LKR {transfer.amount.toFixed(2)}
+          LKR {formatAmount(transfer.amount)}
         </p>
         <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
           {transfer.transfer_date}

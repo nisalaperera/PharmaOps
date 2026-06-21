@@ -10,6 +10,7 @@ import { Button }          from "@/components/ui/Button";
 import { Input }           from "@/components/ui/Input";
 import { apiClient, downloadBlob } from "@/lib/api-client";
 import { showToast }       from "@/lib/toast";
+import { formatAmount }    from "@/lib/utils";
 import { exportQuotationPdfSchema, type ExportQuotationPdfValues } from "../schemas";
 import type { SalesOrder } from "@/types";
 
@@ -63,7 +64,7 @@ export function ExportQuotationPdfModal({ isOpen, onClose, order }: ExportQuotat
             Order #{order.id.slice(-8).toUpperCase()}
           </p>
           <p className="mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            {order.customer_name || "Walk-in"} · {order.items.length} item(s) · LKR {order.total_amount.toFixed(2)}
+            {order.customer_name || "Walk-in"} · {order.items.length} item(s) · LKR {formatAmount(order.total_amount)}
           </p>
         </div>
 

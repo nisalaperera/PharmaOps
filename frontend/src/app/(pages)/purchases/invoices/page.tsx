@@ -18,9 +18,11 @@ import { ConfirmModal }           from "@/components/ui/ConfirmModal";
 import { Button }                 from "@/components/ui/Button";
 import { Badge }                  from "@/components/ui/Badge";
 import { useAuth }                from "@/hooks/useAuth";
+import { useBranch }              from "@/hooks/useBranch";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiDelete, apiDownloadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
+import { formatAmount }           from "@/lib/utils";
 import { PURCHASE_INVOICE_STATUS_FILTER_OPTIONS, PURCHASE_INVOICE_PAYMENT_STATUS_FILTER_OPTIONS } from "@/lib/constants";
 import {
   PURCHASE_INVOICE_STATUS_VARIANT, PURCHASE_INVOICE_STATUS_LABEL,
@@ -31,10 +33,6 @@ import { PurchaseInvoiceModal }   from "./components/PurchaseInvoiceModal";
 import { PurchaseInvoiceViewModal } from "./components/PurchaseInvoiceViewModal";
 import { MultiPaymentModal }      from "./components/MultiPaymentModal";
 import type { PurchaseInvoice, Branch, PaginatedResponse } from "@/types";
-
-function lkr(n: number): string {
-  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 // ─── Export helpers ───────────────────────────────────────────────────────────
 
@@ -49,9 +47,9 @@ function buildRow(inv: PurchaseInvoice, branchNameMap: Record<string, string>): 
     branchNameMap[inv.branch_id] ?? inv.branch_id,
     inv.supplier_name,
     inv.channel_name,
-    lkr(inv.total_amount),
-    lkr(inv.return_amount),
-    lkr(inv.net_amount),
+    formatAmount(inv.total_amount),
+    formatAmount(inv.return_amount),
+    formatAmount(inv.net_amount),
     PURCHASE_INVOICE_STATUS_LABEL[inv.status],
     PURCHASE_INVOICE_PAYMENT_STATUS_LABEL[inv.payment_status],
   ];
@@ -108,9 +106,10 @@ export default function PurchaseInvoicesPage() {
   const canCreate = permissions?.can("BRANCH_USER") ?? false;
   const canDelete = permissions?.can("BRANCH_MANAGER") ?? false;
 
+  const { activeBranchId } = useBranch();
+
   const [statusFilter,        setStatusFilter]        = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
-  const [branchFilter,        setBranchFilter]        = useState("");
   const [filterVisible,       setFilterVisible]       = useState(false);
 
   const [modalOpen,    setModalOpen]    = useState(false);
@@ -122,6 +121,7 @@ export default function PurchaseInvoicesPage() {
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
 
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "created_at", initialSortDirection: "desc" });
@@ -129,13 +129,13 @@ export default function PurchaseInvoicesPage() {
   const filters = {
     ...(statusFilter        && { status:         statusFilter }),
     ...(paymentStatusFilter && { payment_status: paymentStatusFilter }),
-    ...(branchFilter        && { branch_id:      branchFilter }),
+    ...(activeBranchId      && { branch_id:      activeBranchId }),
   };
 
-  const hasActiveFilters  = statusFilter !== "" || paymentStatusFilter !== "" || branchFilter !== "";
-  const activeFilterCount = (statusFilter ? 1 : 0) + (paymentStatusFilter ? 1 : 0) + (branchFilter ? 1 : 0);
+  const hasActiveFilters  = statusFilter !== "" || paymentStatusFilter !== "";
+  const activeFilterCount = (statusFilter ? 1 : 0) + (paymentStatusFilter ? 1 : 0);
 
-  function clearFilters() { setStatusFilter(""); setPaymentStatusFilter(""); setBranchFilter(""); goToPage(1); }
+  function clearFilters() { setStatusFilter(""); setPaymentStatusFilter(""); goToPage(1); }
   function hideFilters()  { clearFilters(); setFilterVisible(false); }
 
   const { data, isLoading } = useQuery<PaginatedResponse<PurchaseInvoice>>({
@@ -178,7 +178,7 @@ export default function PurchaseInvoicesPage() {
         const exportParams: Record<string, unknown> = {};
         if (statusFilter)        exportParams.status         = statusFilter;
         if (paymentStatusFilter) exportParams.payment_status = paymentStatusFilter;
-        if (branchFilter)        exportParams.branch_id      = branchFilter;
+        if (activeBranchId)      exportParams.branch_id      = activeBranchId;
         if (search)              exportParams.search         = search;
         const blob = await apiDownloadFile("/purchases/invoices/export", exportParams);
         downloadBlob(blob, `purchase_invoices_${exportDateStamp()}.csv`);
@@ -195,6 +195,29 @@ export default function PurchaseInvoicesPage() {
   async function handleExportPdf() {
     await exportSelectedPdf(selectedItems, branchNameMap);
   }
+
+  // ─── Bulk delete ──────────────────────────────────────────────────────────────
+
+  const deletableSelected = selectedItems.filter((inv) => inv.status === "DRAFT" && inv.paid_amount <= 0);
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all(deletableSelected.map((inv) => apiDelete(`/purchases/invoices/${inv.id}`)));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["purchase-invoices"] });
+      showToast(
+        "success",
+        "Invoices Deleted",
+        `${deletableSelected.length} draft invoice${deletableSelected.length !== 1 ? "s" : ""} deleted successfully.`,
+      );
+      clearSelection();
+      setConfirmBulkDeleteOpen(false);
+    },
+    onError: (err: { message?: string }) => {
+      showToast("error", "Delete Failed", err?.message ?? "Could not delete some invoices. Please try again.");
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiDelete(`/purchases/invoices/${id}`),
@@ -250,7 +273,7 @@ export default function PurchaseInvoicesPage() {
       sortable: true,
       render:   (row) => (
         <span className="text-sm tabular-nums font-semibold block text-right" style={{ color: "var(--color-text)" }}>
-          {lkr(row.net_amount)}
+          {formatAmount(row.net_amount)}
         </span>
       ),
     },
@@ -378,12 +401,6 @@ export default function PurchaseInvoicesPage() {
           {PURCHASE_INVOICE_PAYMENT_STATUS_FILTER_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
         </select>
 
-        {permissions?.isOrgLevel && (
-          <select value={branchFilter} onChange={(e) => { setBranchFilter(e.target.value); goToPage(1); }} className="form-select w-auto">
-            <option value="">All Branches</option>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        )}
       </FilterBar>
 
       <div className="rounded-2xl shadow-card overflow-hidden" style={{ background: "var(--color-surface)" }}>
@@ -441,6 +458,16 @@ export default function PurchaseInvoicesPage() {
                   Record Payment
                 </Button>
               )}
+              {canDelete && !allPagesSelected && deletableSelected.length > 0 && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                  onClick={() => setConfirmBulkDeleteOpen(true)}
+                >
+                  Delete ({deletableSelected.length})
+                </Button>
+              )}
               <Button variant="outline" size="sm" leftIcon={<FileDown className="w-3.5 h-3.5" />} onClick={handleExportCsv} isLoading={isExportingCsv}>
                 Export CSV
               </Button>
@@ -485,6 +512,17 @@ export default function PurchaseInvoicesPage() {
         confirmLabel="Delete"
         variant="danger"
         isLoading={deleteMutation.isPending}
+      />
+
+      <ConfirmModal
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        title="Delete Draft Invoices"
+        body={`Are you sure you want to delete ${deletableSelected.length} draft invoice${deletableSelected.length !== 1 ? "s" : ""}? This action cannot be undone.`}
+        confirmLabel="Delete Invoices"
+        variant="danger"
+        onConfirm={() => bulkDeleteMutation.mutate()}
+        isLoading={bulkDeleteMutation.isPending}
       />
     </div>
   );

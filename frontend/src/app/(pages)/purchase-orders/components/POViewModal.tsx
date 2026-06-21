@@ -3,6 +3,7 @@
 import { Modal } from "@/components/ui/Modal";
 import { Badge } from "@/components/ui/Badge";
 import { PO_STATUS_LABEL, PO_STATUS_VARIANT } from "@/lib/badges";
+import { formatAmount, formatQuantity } from "@/lib/utils";
 import type { PurchaseOrder } from "@/types";
 
 interface POViewModalProps {
@@ -73,7 +74,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
               Total Amount
             </dt>
             <dd className="text-sm font-bold tabular-nums mt-1" style={{ color: "var(--color-text)" }}>
-              {po.total_amount.toFixed(2)}
+              {formatAmount(po.total_amount)}
             </dd>
           </div>
 
@@ -139,13 +140,13 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                       {item.product_name}
                     </td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                      {item.unit_quantity.toLocaleString()}
+                      {formatQuantity(item.unit_quantity)}
                     </td>
                     <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>
-                      {item.unit_price.toFixed(2)}
+                      {formatAmount(item.unit_price)}
                     </td>
                     <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>
-                      {item.line_total.toFixed(2)}
+                      {formatAmount(item.line_total)}
                     </td>
                   </tr>
                 ))}
@@ -156,7 +157,7 @@ export function POViewModal({ isOpen, onClose, po, branchNameMap }: POViewModalP
                     Order Total
                   </td>
                   <td className="px-3 py-2 tabular-nums font-bold text-sm" style={{ color: "var(--color-text)" }}>
-                    {po.total_amount.toFixed(2)}
+                    {formatAmount(po.total_amount)}
                   </td>
                 </tr>
               </tfoot>

@@ -1,16 +1,9 @@
 from fastapi import APIRouter, Depends, Query
 from app.core.database import get_db, Collections
 from app.middleware.auth_middleware import require_min_role
+from app.utils.branch_scope import BRANCH_LEVEL_ROLES, effective_branch_id
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
-
-BRANCH_LEVEL_ROLES = {"BRANCH_ADMIN", "BRANCH_MANAGER", "BRANCH_USER"}
-
-
-def _effective_branch(current_user: dict, branch_id: str | None) -> str | None:
-    if current_user["role"] in BRANCH_LEVEL_ROLES:
-        return current_user["branch_id"]
-    return branch_id or None
 
 
 # ── Sales Summary ─────────────────────────────────────────────────────────────
@@ -25,7 +18,7 @@ async def sales_summary(
     db  = get_db()
     flt: dict = {}
 
-    branch = _effective_branch(current_user, branch_id)
+    branch = effective_branch_id(current_user, branch_id)
     if branch:
         flt["branch_id"] = branch
 
@@ -60,7 +53,7 @@ async def stock_valuation(
     db  = get_db()
     flt: dict = {}
 
-    branch = _effective_branch(current_user, branch_id)
+    branch = effective_branch_id(current_user, branch_id)
     if branch:
         flt["branch_id"] = branch
 
@@ -105,7 +98,7 @@ async def expiry_report(
     db  = get_db()
     flt: dict = {}
 
-    branch = _effective_branch(current_user, branch_id)
+    branch = effective_branch_id(current_user, branch_id)
     if branch:
         flt["branch_id"] = branch
 

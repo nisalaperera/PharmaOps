@@ -8,8 +8,9 @@ import { FileText } from "lucide-react";
 import { Modal }  from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input }  from "@/components/ui/Input";
-import { apiPost }   from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import { convertToInvoiceSchema, type ConvertToInvoiceValues } from "../schemas";
 import type { SalesOrder, Sale } from "@/types";
 
@@ -78,7 +79,7 @@ export function ConvertToInvoiceModal({ isOpen, onClose, order }: ConvertToInvoi
             Order #{order.id.slice(-8).toUpperCase()}
           </p>
           <p className="mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            {order.customer_name || "Walk-in"} · {order.items.length} item(s) · LKR {order.total_amount.toFixed(2)}
+            {order.customer_name || "Walk-in"} · {order.items.length} item(s) · LKR {formatAmount(order.total_amount)}
           </p>
         </div>
 
@@ -123,7 +124,7 @@ export function ConvertToInvoiceModal({ isOpen, onClose, order }: ConvertToInvoi
           />
           {order.total_amount > 0 && (
             <p className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
-              Order total: LKR {order.total_amount.toFixed(2)}
+              Order total: LKR {formatAmount(order.total_amount)}
             </p>
           )}
         </div>

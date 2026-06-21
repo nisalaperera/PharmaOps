@@ -70,9 +70,14 @@ export function BranchViewModal({ isOpen, onClose, branch }: BranchViewModalProp
           className="p-4 rounded-xl"
           style={{ background: "var(--color-surface-2)" }}
         >
-          <p className="font-semibold text-base" style={{ color: "var(--color-text)" }}>
-            {branch.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-semibold text-base" style={{ color: "var(--color-text)" }}>
+              {branch.name}
+            </p>
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--color-surface)", color: "var(--color-text-muted)" }}>
+              {branch.code}
+            </span>
+          </div>
           <p className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>
             {branch.address}
           </p>

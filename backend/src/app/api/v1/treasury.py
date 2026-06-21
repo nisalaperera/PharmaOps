@@ -4,6 +4,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.models.treasury import (
     CashRegistryCreate, CashRegistryUpdate, CashRegistryResponse,
     OpenRegistryPayload, CloseRegistryPayload, RegistryTransactionPayload,
@@ -67,9 +68,7 @@ async def list_cash_registries(
 ):
     db  = get_db()
     flt: dict = {}
-
-    if branch_id:
-        flt["branch_id"] = branch_id
+    apply_branch_filter(flt, current_user, branch_id)
     if is_active is not None:
         flt["is_active"] = is_active
     if search:
@@ -102,6 +101,7 @@ async def create_cash_registry(
 ):
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     branch_name           = _lookup_branch_name(db, payload.branch_id)
     responsible_staff_name = _lookup_staff_name(db, payload.responsible_staff_id)
@@ -139,7 +139,9 @@ async def get_cash_registry(
     doc = db[Collections.CASH_REGISTRIES].find_one({"_id": registry_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Cash registry not found")
-    return CashRegistryResponse(**doc_to_dict(doc))
+    registry = doc_to_dict(doc)
+    ensure_branch_access(registry, current_user)
+    return CashRegistryResponse(**registry)
 
 
 @router.patch("/registries/{registry_id}", response_model=CashRegistryResponse)
@@ -148,9 +150,11 @@ async def update_cash_registry(
     payload:      CashRegistryUpdate,
     current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
-    db = get_db()
-    if not db[Collections.CASH_REGISTRIES].find_one({"_id": registry_id}):
+    db  = get_db()
+    doc = db[Collections.CASH_REGISTRIES].find_one({"_id": registry_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="Cash registry not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
 
@@ -183,6 +187,7 @@ async def open_cash_registry(
         raise HTTPException(status_code=404, detail="Cash registry not found")
 
     registry = doc_to_dict(doc)
+    ensure_branch_access(registry, current_user)
     if registry["is_open"]:
         raise HTTPException(status_code=400, detail="Cash registry is already open")
 
@@ -226,6 +231,7 @@ async def close_cash_registry(
         raise HTTPException(status_code=404, detail="Cash registry not found")
 
     registry = doc_to_dict(doc)
+    ensure_branch_access(registry, current_user)
     if not registry["is_open"]:
         raise HTTPException(status_code=400, detail="Cash registry is not open")
 
@@ -271,6 +277,7 @@ async def deposit_to_registry(
         raise HTTPException(status_code=404, detail="Cash registry not found")
 
     registry = doc_to_dict(doc)
+    ensure_branch_access(registry, current_user)
     if not registry["is_active"]:
         raise HTTPException(status_code=400, detail="Cash registry is inactive")
     if not registry["is_open"]:
@@ -316,6 +323,7 @@ async def withdraw_from_registry(
         raise HTTPException(status_code=404, detail="Cash registry not found")
 
     registry = doc_to_dict(doc)
+    ensure_branch_access(registry, current_user)
     if not registry["is_active"]:
         raise HTTPException(status_code=400, detail="Cash registry is inactive")
     if not registry["is_open"]:
@@ -360,8 +368,10 @@ async def list_registry_transactions(
     current_user: dict = Depends(get_current_user),
 ):
     db  = get_db()
-    if not db[Collections.CASH_REGISTRIES].find_one({"_id": registry_id}):
+    reg_doc = db[Collections.CASH_REGISTRIES].find_one({"_id": registry_id})
+    if not reg_doc:
         raise HTTPException(status_code=404, detail="Cash registry not found")
+    ensure_branch_access(doc_to_dict(reg_doc), current_user)
 
     docs = (
         db[Collections.CASH_REGISTRY_TRANSACTIONS]
@@ -389,9 +399,7 @@ async def list_bank_accounts(
 ):
     db  = get_db()
     flt: dict = {}
-
-    if branch_id:
-        flt["branch_id"] = branch_id
+    apply_branch_filter(flt, current_user, branch_id)
     if is_active is not None:
         flt["is_active"] = is_active
     if search:
@@ -424,6 +432,7 @@ async def create_bank_account(
 ):
     db  = get_db()
     now = datetime.now(timezone.utc).isoformat()
+    payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     branch_name = _lookup_branch_name(db, payload.branch_id)
 
@@ -459,7 +468,9 @@ async def get_bank_account(
     doc = db[Collections.BANK_ACCOUNTS].find_one({"_id": account_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Bank account not found")
-    return BankAccountResponse(**doc_to_dict(doc))
+    account = doc_to_dict(doc)
+    ensure_branch_access(account, current_user)
+    return BankAccountResponse(**account)
 
 
 @router.patch("/bank-accounts/{account_id}", response_model=BankAccountResponse)
@@ -468,9 +479,11 @@ async def update_bank_account(
     payload:      BankAccountUpdate,
     current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
 ):
-    db = get_db()
-    if not db[Collections.BANK_ACCOUNTS].find_one({"_id": account_id}):
+    db  = get_db()
+    doc = db[Collections.BANK_ACCOUNTS].find_one({"_id": account_id})
+    if not doc:
         raise HTTPException(status_code=404, detail="Bank account not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
@@ -498,6 +511,7 @@ async def deposit_to_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
 
     account = doc_to_dict(doc)
+    ensure_branch_access(account, current_user)
     if not account["is_active"]:
         raise HTTPException(status_code=400, detail="Bank account is inactive")
 
@@ -541,6 +555,7 @@ async def withdraw_from_bank_account(
         raise HTTPException(status_code=404, detail="Bank account not found")
 
     account = doc_to_dict(doc)
+    ensure_branch_access(account, current_user)
     if not account["is_active"]:
         raise HTTPException(status_code=400, detail="Bank account is inactive")
     if payload.amount > account["current_balance"]:
@@ -583,8 +598,10 @@ async def list_bank_account_transactions(
     current_user: dict = Depends(get_current_user),
 ):
     db  = get_db()
-    if not db[Collections.BANK_ACCOUNTS].find_one({"_id": account_id}):
+    acct_doc = db[Collections.BANK_ACCOUNTS].find_one({"_id": account_id})
+    if not acct_doc:
         raise HTTPException(status_code=404, detail="Bank account not found")
+    ensure_branch_access(doc_to_dict(acct_doc), current_user)
 
     docs = (
         db[Collections.BANK_ACCOUNT_TRANSACTIONS]
@@ -610,9 +627,7 @@ async def list_fund_transfers(
 ):
     db  = get_db()
     flt: dict = {}
-
-    if branch_id:
-        flt["branch_id"] = branch_id
+    apply_branch_filter(flt, current_user, branch_id)
 
     sort_field     = sort_by if sort_by in TRANSFER_SORT_FIELDS else "transfer_date"
     sort_direction = -1 if sort_dir == "desc" else 1
@@ -807,4 +822,6 @@ async def get_fund_transfer(
     doc = db[Collections.FUND_TRANSFERS].find_one({"_id": transfer_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Fund transfer not found")
-    return FundTransferResponse(**doc_to_dict(doc))
+    transfer = doc_to_dict(doc)
+    ensure_branch_access(transfer, current_user)
+    return FundTransferResponse(**transfer)

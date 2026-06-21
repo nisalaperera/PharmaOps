@@ -15,8 +15,9 @@ import {
   PURCHASE_INVOICE_PAYMENT_STATUS_VARIANT, PURCHASE_INVOICE_PAYMENT_STATUS_LABEL,
 } from "@/lib/badges";
 import { PAYMENT_METHOD_LABEL, PURCHASE_PAYMENT_METHOD_OPTIONS } from "@/lib/constants";
-import { apiPost }   from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import { useAuth }   from "@/hooks/useAuth";
 import type { PurchaseInvoice } from "@/types";
 
@@ -34,10 +35,6 @@ const singlePaymentSchema = z.object({
   reference:      z.string().optional(),
 });
 type SinglePaymentValues = z.infer<typeof singlePaymentSchema>;
-
-function lkr(n: number): string {
-  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameMap }: PurchaseInvoiceViewModalProps) {
   const queryClient = useQueryClient();
@@ -157,10 +154,10 @@ export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameM
                       <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>{item.expiry_date}</td>
                       <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text)" }}>{item.unit_quantity}</td>
                       <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{item.free_quantity}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{lkr(item.discount)}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{lkr(item.unit_price)}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{lkr(item.selling_price)}</td>
-                      <td className="px-3 py-2 tabular-nums font-semibold text-right" style={{ color: "var(--color-text)" }}>{lkr(item.line_total)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.discount)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.unit_price)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.selling_price)}</td>
+                      <td className="px-3 py-2 tabular-nums font-semibold text-right" style={{ color: "var(--color-text)" }}>{formatAmount(item.line_total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -188,8 +185,8 @@ export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameM
                       <td className="px-3 py-2 font-medium" style={{ color: "var(--color-text)" }}>{item.product_name}</td>
                       <td className="px-3 py-2 font-mono" style={{ color: "var(--color-text-muted)" }}>{item.batch_number || "—"}</td>
                       <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text)" }}>{item.quantity}</td>
-                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{lkr(item.unit_price)}</td>
-                      <td className="px-3 py-2 tabular-nums font-semibold text-right" style={{ color: "var(--color-text)" }}>{lkr(item.line_total)}</td>
+                      <td className="px-3 py-2 tabular-nums" style={{ color: "var(--color-text-muted)" }}>{formatAmount(item.unit_price)}</td>
+                      <td className="px-3 py-2 tabular-nums font-semibold text-right" style={{ color: "var(--color-text)" }}>{formatAmount(item.line_total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -200,9 +197,9 @@ export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameM
 
         {/* Totals */}
         <div className="flex flex-col items-end gap-1 text-sm">
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Total:</span><span className="font-semibold tabular-nums w-36 text-right" style={{ color: "var(--color-text)" }}>{lkr(invoice.total_amount)}</span></div>
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Return:</span><span className="font-semibold tabular-nums w-36 text-right" style={{ color: "var(--color-text)" }}>{lkr(invoice.return_amount)}</span></div>
-          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Net Payable:</span><span className="font-bold tabular-nums w-36 text-right text-base" style={{ color: "var(--color-text)" }}>{lkr(invoice.net_amount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Total:</span><span className="font-semibold tabular-nums w-36 text-right" style={{ color: "var(--color-text)" }}>{formatAmount(invoice.total_amount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Return:</span><span className="font-semibold tabular-nums w-36 text-right" style={{ color: "var(--color-text)" }}>{formatAmount(invoice.return_amount)}</span></div>
+          <div className="flex gap-3"><span style={{ color: "var(--color-text-muted)" }}>Net Payable:</span><span className="font-bold tabular-nums w-36 text-right text-base" style={{ color: "var(--color-text)" }}>{formatAmount(invoice.net_amount)}</span></div>
         </div>
 
         {/* Verify */}
@@ -219,8 +216,8 @@ export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameM
             <div>
               <h3 className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>Payments</h3>
               <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-                Paid: {lkr(invoice.paid_amount)} / {lkr(invoice.net_amount)}
-                {balance > 0.001 && <span className="ml-2 text-amber-500 font-medium">Balance: {lkr(balance)}</span>}
+                Paid: {formatAmount(invoice.paid_amount)} / {formatAmount(invoice.net_amount)}
+                {balance > 0.001 && <span className="ml-2 text-amber-500 font-medium">Balance: {formatAmount(balance)}</span>}
               </p>
             </div>
             {invoice.payment_status !== "PAID" && invoice.net_amount > 0 && (
@@ -275,7 +272,7 @@ export function PurchaseInvoiceViewModal({ isOpen, onClose, invoice, branchNameM
                       <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>{entry.payment_date}</td>
                       <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>{PAYMENT_METHOD_LABEL[entry.payment_method] ?? entry.payment_method}</td>
                       <td className="px-3 py-2" style={{ color: "var(--color-text-muted)" }}>{entry.reference || "—"}</td>
-                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{lkr(entry.amount)}</td>
+                      <td className="px-3 py-2 tabular-nums font-semibold" style={{ color: "var(--color-text)" }}>{formatAmount(entry.amount)}</td>
                     </tr>
                   ))}
                 </tbody>

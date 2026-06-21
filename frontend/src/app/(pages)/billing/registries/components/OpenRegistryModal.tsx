@@ -7,8 +7,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Modal }   from "@/components/ui/Modal";
 import { Button }  from "@/components/ui/Button";
 import { Input }   from "@/components/ui/Input";
-import { apiPost } from "@/lib/api-client";
-import { showToast } from "@/lib/toast";
+import { apiPost }      from "@/lib/api-client";
+import { showToast }    from "@/lib/toast";
+import { formatAmount } from "@/lib/utils";
 import {
   openRegistrySchema,
   type OpenRegistryValues,
@@ -48,7 +49,7 @@ export function OpenRegistryModal({ isOpen, onClose, registry }: OpenRegistryMod
       showToast(
         "success",
         "Registry Opened",
-        `${registry!.name} is now open with balance LKR ${values.opening_balance.toFixed(2)}`
+        `${registry!.name} is now open with balance LKR ${formatAmount(values.opening_balance)}`
       );
       onClose();
     },
@@ -93,7 +94,7 @@ export function OpenRegistryModal({ isOpen, onClose, registry }: OpenRegistryMod
           error={form.formState.errors.opening_balance?.message}
           helperText={
             registry.current_balance > 0
-              ? `Current balance: LKR ${registry.current_balance.toFixed(2)}`
+              ? `Current balance: LKR ${formatAmount(registry.current_balance)}`
               : undefined
           }
           {...form.register("opening_balance", { valueAsNumber: true })}

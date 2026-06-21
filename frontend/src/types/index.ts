@@ -91,6 +91,7 @@ export interface BranchOperatingHours {
 export interface Branch {
   id: string;
   name: string;
+  code: string;
   address: string;
   phone: string;
   license_number: string;
@@ -765,6 +766,30 @@ export interface DashboardStats {
   pending_po_count: number;
   recent_sales:     DashboardRecentSale[];
   branch_summaries: DashboardBranchSummary[];
+}
+
+export interface RevenueTrendPoint {
+  date:   string;
+  amount: number;
+  count:  number;
+}
+
+export interface TopProduct {
+  product_name: string;
+  total_qty:    number;
+  total_amount: number;
+}
+
+export interface PaymentBreakdown {
+  method: string;
+  count:  number;
+  amount: number;
+}
+
+export interface DashboardCharts {
+  revenue_trend:     RevenueTrendPoint[];
+  top_products:      TopProduct[];
+  payment_breakdown: PaymentBreakdown[];
 }
 
 // ─── Reports ──────────────────────────────────────────────────────────────────

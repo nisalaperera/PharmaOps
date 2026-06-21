@@ -12,6 +12,7 @@ import { Autocomplete } from "@/components/ui/Autocomplete";
 import { useAuth } from "@/hooks/useAuth";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { showToast }       from "@/lib/toast";
+import { formatAmount }    from "@/lib/utils";
 import { PURCHASE_INVOICE_STATUS_OPTIONS } from "@/lib/constants";
 import type {
   Product, Supplier, Branch, PurchaseOrder, PurchaseInvoice, PaginatedResponse,
@@ -39,10 +40,6 @@ function newKey(): string {
 
 function lineTotal(l: GrnLine): number {
   return l.unit_quantity * l.unit_price - l.discount;
-}
-
-function lkr(n: number): string {
-  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────────
@@ -337,7 +334,7 @@ export default function GrnPage() {
                       <input type="number" min={0} step={0.01} className="grn-cell text-right" value={l.selling_price || ""} onChange={(e) => updateLine(l.key, { selling_price: parseFloat(e.target.value) || 0 })} />
                     </Field>
                     <Field label="Line Total">
-                      <div className="grn-cell text-right tabular-nums flex items-center justify-end" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{lkr(lineTotal(l))}</div>
+                      <div className="grn-cell text-right tabular-nums flex items-center justify-end" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{formatAmount(lineTotal(l))}</div>
                     </Field>
                   </div>
                 </div>
@@ -408,7 +405,7 @@ export default function GrnPage() {
           <div className="space-y-1.5">
             <div className="flex justify-between text-sm">
               <span style={{ color: "var(--color-text-muted)" }}>Total</span>
-              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{lkr(total)}</span>
+              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(total)}</span>
             </div>
             <div className="flex justify-between text-sm items-center">
               <span style={{ color: "var(--color-text-muted)" }}>Return</span>
@@ -418,7 +415,7 @@ export default function GrnPage() {
             <div className="h-px my-1" style={{ background: "var(--color-border)" }} />
             <div className="flex justify-between font-bold text-base">
               <span style={{ color: "var(--color-text)" }}>Net Payable</span>
-              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{lkr(net)}</span>
+              <span className="tabular-nums" style={{ color: "var(--color-text)" }}>{formatAmount(net)}</span>
             </div>
           </div>
         </div>
@@ -432,7 +429,7 @@ export default function GrnPage() {
         {/* Action */}
         <div className="p-4 mt-auto">
           <Button variant="primary" className="w-full" size="lg" onClick={handleSubmit} isLoading={mutation.isPending} disabled={lines.length === 0}>
-            Create Invoice · {lkr(net)}
+            Create Invoice · {formatAmount(net)}
           </Button>
         </div>
       </div>

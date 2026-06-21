@@ -6,6 +6,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware  import get_current_user, require_min_role
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit  import audit_create_fields, audit_update_fields
+from app.utils.branch_scope import apply_branch_filter, ensure_branch_access
 from app.models.cheque import (
     ChequeBookCreate, ChequeBookUpdate, ChequeBookResponse,
     ChequeIssueCreate, ChequeIssueStatusUpdate, ChequeIssueResponse,
@@ -40,6 +41,7 @@ async def list_cheque_books(
 ):
     db    = get_db()
     query: dict = {}
+    apply_branch_filter(query, current_user)
 
     if bank_account_id:
         query["bank_account_id"] = bank_account_id
@@ -79,6 +81,7 @@ async def create_cheque_book(
     account_doc = db[Collections.BANK_ACCOUNTS].find_one({"_id": payload.bank_account_id})
     if not account_doc:
         raise HTTPException(status_code=404, detail="Bank account not found")
+    ensure_branch_access(doc_to_dict(account_doc), current_user)
     if not account_doc.get("is_active", False):
         raise HTTPException(status_code=400, detail="Bank account is inactive")
 
@@ -119,6 +122,7 @@ async def update_cheque_book(
     doc = db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Cheque book not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
 
     updates = payload.model_dump(exclude_none=True)
     if not updates:
@@ -148,8 +152,10 @@ async def list_cheque_issues(
 ):
     db = get_db()
 
-    if not db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id}):
+    book_doc = db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id})
+    if not book_doc:
         raise HTTPException(status_code=404, detail="Cheque book not found")
+    ensure_branch_access(doc_to_dict(book_doc), current_user)
 
     query: dict = {"cheque_book_id": book_id}
     if status:
@@ -182,6 +188,7 @@ async def create_cheque_issue(
     book_doc = db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id})
     if not book_doc:
         raise HTTPException(status_code=404, detail="Cheque book not found")
+    ensure_branch_access(doc_to_dict(book_doc), current_user)
     if not book_doc.get("is_active", False):
         raise HTTPException(status_code=400, detail="Cheque book is inactive")
 
@@ -237,8 +244,10 @@ async def update_cheque_issue_status(
 ):
     db = get_db()
 
-    if not db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id}):
+    book_doc = db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id})
+    if not book_doc:
         raise HTTPException(status_code=404, detail="Cheque book not found")
+    ensure_branch_access(doc_to_dict(book_doc), current_user)
 
     issue_doc = db[Collections.CHEQUE_ISSUES].find_one({"_id": issue_id, "cheque_book_id": book_id})
     if not issue_doc:
