@@ -3,6 +3,7 @@ import type {
   SkuType, PurchaseOrderStatus, GRNStatus,
   PurchaseInvoiceStatus, PurchaseInvoicePaymentStatus, SalesOrderStatus, TransferStatus,
   SupplierType, ChannelCategory, ContactType,
+  StockMovementType, StockMovementStatus, StockMovementLogType,
 } from "@/types";
 
 export type BadgeVariant = "default" | "success" | "warning" | "danger" | "info" | "outline";
@@ -53,13 +54,50 @@ export const SKU_TYPE_VARIANT: Record<SkuType, BadgeVariant> = {
 };
 
 
+// ─── Stock Movement ──────────────────────────────────────────────────────────
+
+export const STOCK_MOVEMENT_TYPE_VARIANT: Record<StockMovementType, BadgeVariant> = {
+  STOCK_IN:  "info",
+  STOCK_OUT: "warning",
+};
+
+export const STOCK_MOVEMENT_STATUS_VARIANT: Record<StockMovementStatus, BadgeVariant> = {
+  CREATED:             "default",
+  PARTIALLY_COMPLETED: "warning",
+  COMPLETED:           "success",
+};
+
+// ─── Movement Log Types ──────────────────────────────────────────────────────
+
+export const MOVEMENT_LOG_TYPE_VARIANT: Record<StockMovementLogType, BadgeVariant> = {
+  STOCK_IN:     "success",
+  STOCK_OUT:    "danger",
+  TRANSFER_IN:  "info",
+  TRANSFER_OUT: "warning",
+  PURCHASE:     "info",
+  SALE:         "warning",
+};
+
 // ─── Transfer status ─────────────────────────────────────────────────────────
 
 export const TRANSFER_STATUS_VARIANT: Record<TransferStatus, BadgeVariant> = {
-  PENDING:   "warning",
-  CONFIRMED: "success",
-  REJECTED:  "danger",
-  CANCELLED: "default",
+  PENDING:            "warning",
+  IN_TRANSIT:         "info",
+  PARTIALLY_RECEIVED: "warning",
+  RECEIVED:           "success",
+  REJECTED:           "danger",
+  CANCELLED:          "default",
+};
+
+// ─── Credit Note status ──────────────────────────────────────────────────────
+
+import type { CreditNoteStatus } from "@/types";
+
+export const CREDIT_NOTE_STATUS_VARIANT: Record<CreditNoteStatus, BadgeVariant> = {
+  DRAFT:     "default",
+  APPROVED:  "info",
+  APPLIED:   "success",
+  CANCELLED: "danger",
 };
 
 // ─── Purchase Order status ────────────────────────────────────────────────────

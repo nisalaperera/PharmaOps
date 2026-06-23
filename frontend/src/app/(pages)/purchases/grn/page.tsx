@@ -353,7 +353,7 @@ export default function GrnPage() {
           <Autocomplete
             value={supplierId}
             onChange={(v) => { setSupplierId(v); setChannelId(""); }}
-            options={suppliers.map((s) => ({ value: s.id, label: s.short_name }))}
+            options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
             placeholder="Search distributor…"
           />
           <Autocomplete

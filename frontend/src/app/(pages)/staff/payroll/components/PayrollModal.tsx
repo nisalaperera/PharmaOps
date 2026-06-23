@@ -116,7 +116,7 @@ export function PayrollModal({ isOpen, onClose }: PayrollModalProps) {
     >
       <div className="space-y-4">
 
-        {/* Branch â€” org-level only */}
+        {/* Branch — org-level only */}
         {permissions?.isOrgLevel && (
           <div>
             <label className="form-label">
@@ -137,7 +137,7 @@ export function PayrollModal({ isOpen, onClose }: PayrollModalProps) {
                     form.setValue("staff_id", "");
                   }}
                 >
-                  <option value="">Select branchâ€¦</option>
+                  <option value="">Select branch...</option>
                   {branches.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
@@ -166,8 +166,8 @@ export function PayrollModal({ isOpen, onClose }: PayrollModalProps) {
           >
             <option value="">
               {permissions?.isOrgLevel && !staffQueryBranch
-                ? "Select a branch firstâ€¦"
-                : "Select staff memberâ€¦"}
+                ? "Select a branch first..."
+                : "Select staff member..."}
             </option>
             {staffList.map((s) => (
               <option key={s.id} value={s.id}>{getStaffDisplayName(s)}</option>
@@ -221,7 +221,7 @@ export function PayrollModal({ isOpen, onClose }: PayrollModalProps) {
               className="text-xs py-3 text-center rounded-lg border border-dashed"
               style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}
             >
-              No deductions â€” gross salary will equal net salary
+              No deductions — gross salary will equal net salary
             </p>
           ) : (
             <div className="space-y-2">

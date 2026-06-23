@@ -29,6 +29,10 @@ const EMPTY_CONTACT = {
 const EMPTY_AGENCY_CHANNEL: AgencyChannelValues = {
   channel_name:     "",
   contacts:         [{ ...EMPTY_CONTACT }],
+  entity_contacts:  [],
+  credit_term_days: 30,
+  credit_limit:     undefined,
+  promotions:       [],
   product_mappings: [],
 };
 
@@ -38,8 +42,11 @@ const EMPTY_DISTRIBUTOR_CHANNEL: DistributorChannelValues = {
   agency_id:          "",
   agency_name:        "",
   credit_term_days:   30,
+  credit_limit:       undefined,
   delivery_frequency: "WEEKLY",
   contacts:           [{ ...EMPTY_CONTACT }],
+  entity_contacts:    [],
+  promotions:         [],
   product_mappings:   [],
 };
 

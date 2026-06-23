@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { entityContactSchema } from "@/app/(pages)/organization/schemas";
 
 const PHONE_REGEX = /^\d{3} \d{3} \d{4}$/;
 const PHONE_MSG   = "Format: ### ### ####";
 
-// ─── Contact ──────────────────────────────────────────────────────────────────
+// ─── Contact (legacy channel contact) ────────────────────────────────────────
 
 export const contactSchema = z.object({
   id:           z.string().optional(),
@@ -16,11 +17,31 @@ export const contactSchema = z.object({
   contact_type: z.enum(["SALES", "DELIVERY"]),
 });
 
+// ─── Promotion ───────────────────────────────────────────────────────────────
+
+export const channelPromotionSchema = z.object({
+  id:               z.string().optional(),
+  name:             z.string().min(1, "Name is required"),
+  promotion_type:   z.enum(["PERCENTAGE", "BONUS_QUANTITY"]),
+  discount_percent: z.coerce.number().min(0).max(100).nullable().optional(),
+  buy_quantity:     z.coerce.number().int().min(1).nullable().optional(),
+  free_quantity:    z.coerce.number().int().min(1).nullable().optional(),
+  is_default:       z.boolean(),
+  valid_from:       z.string().optional().nullable(),
+  valid_to:         z.string().optional().nullable(),
+  is_active:        z.boolean(),
+});
+
 // ─── Product mapping ──────────────────────────────────────────────────────────
 
 export const productMappingSchema = z.object({
-  product_id:   z.string().min(1),
-  product_name: z.string().min(1),
+  product_id:            z.string().min(1),
+  product_name:          z.string().min(1),
+  sort_order:            z.coerce.number().int().default(0),
+  cost_price:            z.coerce.number().min(0).nullable().optional(),
+  pack_sku_id:           z.string().nullable().optional(),
+  pack_sku_name:         z.string().nullable().optional(),
+  default_promotion_ids: z.array(z.string()).default([]),
 });
 
 // ─── Agency channel ───────────────────────────────────────────────────────────
@@ -29,6 +50,10 @@ export const agencyChannelSchema = z.object({
   id:               z.string().optional(),
   channel_name:     z.string().min(1, "Channel name is required"),
   contacts:         z.array(contactSchema).min(1, "At least one contact is required"),
+  entity_contacts:  z.array(entityContactSchema).default([]),
+  credit_term_days: z.coerce.number().int().min(0).default(30),
+  credit_limit:     z.coerce.number().min(0).nullable().optional(),
+  promotions:       z.array(channelPromotionSchema).default([]),
   product_mappings: z.array(productMappingSchema).default([]),
 });
 
@@ -41,8 +66,11 @@ export const distributorChannelSchema = z.object({
   agency_id:         z.string().optional(),
   agency_name:       z.string().optional(),
   credit_term_days:  z.coerce.number().int().min(0, "Must be 0 or greater"),
+  credit_limit:      z.coerce.number().min(0).nullable().optional(),
   delivery_frequency: z.enum(["DAILY", "WEEKLY", "BI_WEEKLY", "MONTHLY", "AS_NEEDED"]),
   contacts:          z.array(contactSchema).min(1, "At least one contact is required"),
+  entity_contacts:   z.array(entityContactSchema).default([]),
+  promotions:        z.array(channelPromotionSchema).default([]),
   product_mappings:  z.array(productMappingSchema).default([]),
 }).refine(
   (ch) => ch.channel_category !== "AGENCY" || !!ch.agency_id,
@@ -53,9 +81,12 @@ export const distributorChannelSchema = z.object({
 
 export const supplierSchema = z.object({
   supplier_type:       z.enum(["AGENCY", "DISTRIBUTOR"]),
-  short_name:          z.string().min(1, "Short name is required"),
+  name:                z.string().min(1, "Name is required"),
   legal_name:          z.string().min(1, "Legal name is required"),
   registration_number: z.string().optional(),
+  credit_term_days:    z.coerce.number().int().min(0).default(30),
+  credit_limit:        z.coerce.number().min(0).nullable().optional(),
+  notes:               z.string().optional().nullable(),
 });
 
 // ─── Channel management (used by ChannelManagementModal) ─────────────────────

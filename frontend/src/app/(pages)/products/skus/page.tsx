@@ -61,7 +61,7 @@ async function exportSkusPdf(skus: ProductSku[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal â€” continue without it.
+    // Logo load failure is non-fatal — continue without it.
   }
 
   doc.setFontSize(13);
@@ -71,7 +71,7 @@ async function exportSkusPdf(skus: ProductSku[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`SKUs Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`SKUs Report — ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -224,7 +224,7 @@ export default function SkusPage() {
       header: "Plural",
       render: (row) => (
         <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.plural || "â€”"}
+          {row.plural || "—"}
         </span>
       ),
     },
@@ -321,7 +321,7 @@ export default function SkusPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search by name or pluralâ€¦"
+            placeholder="Search by name or plural..."
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />

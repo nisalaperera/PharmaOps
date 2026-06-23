@@ -8,16 +8,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PackageMinus } from "lucide-react";
 import { Modal }    from "@/components/ui/Modal";
 import { Button }   from "@/components/ui/Button";
-import { Input }    from "@/components/ui/Input";
+import { FormattedInput } from "@/components/ui/FormattedInput";
 import { apiPost }  from "@/lib/api-client";
 import { showToast } from "@/lib/toast";
+import { formatQuantity } from "@/lib/utils";
 import { STOCK_OUT_REASON_OPTIONS } from "@/lib/constants";
 import type { InventoryItem } from "@/types";
 
 const stockOutSchema = z.object({
   batch_number: z.string().min(1, "Select a batch"),
   quantity:     z.number({ invalid_type_error: "Quantity is required" }).int().min(1, "Must be at least 1"),
-  reason:       z.enum(["DAMAGED", "EXPIRED", "OTHER"], { errorMap: () => ({ message: "Select a reason" }) }),
+  reason:       z.enum(["DAMAGED", "EXPIRED", "STOCKTAKE_CORRECTION", "LOST", "OTHER"], { errorMap: () => ({ message: "Select a reason" }) }),
   notes:        z.string().optional().nullable(),
 });
 
@@ -117,7 +118,7 @@ export function StockOutModal({ isOpen, onClose, inventoryItem }: StockOutModalP
             <select className="form-select" {...register("batch_number")}>
               {availableBatches.map((b) => (
                 <option key={b.batch_number} value={b.batch_number}>
-                  {b.batch_number} ({b.quantity} units · exp {b.expiry_date})
+                  {b.batch_number} ({formatQuantity(b.quantity)} units · exp {b.expiry_date})
                 </option>
               ))}
             </select>
@@ -127,7 +128,7 @@ export function StockOutModal({ isOpen, onClose, inventoryItem }: StockOutModalP
           )}
           {selectedBatch && (
             <p className="mt-1 text-xs" style={{ color: "var(--color-text-muted)" }}>
-              Available: <span className="font-semibold">{selectedBatch.quantity}</span> units
+              Available: <span className="font-semibold">{formatQuantity(selectedBatch.quantity)}</span> units
             </p>
           )}
         </div>
@@ -137,14 +138,15 @@ export function StockOutModal({ isOpen, onClose, inventoryItem }: StockOutModalP
           name="quantity"
           control={control}
           render={({ field }) => (
-            <Input
+            <FormattedInput
+              value={field.value}
+              onChange={field.onChange}
+              format="quantity"
               label="Quantity to Remove"
-              type="number"
-              placeholder="e.g. 10"
+              min={1}
+              max={selectedBatch?.quantity}
               required
               error={errors.quantity?.message}
-              value={field.value || ""}
-              onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
             />
           )}
         />

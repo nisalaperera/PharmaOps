@@ -147,13 +147,13 @@ export function AttendanceViewModal({ isOpen, onClose, record }: AttendanceViewM
           >
             <ActivityRow
               label="Recorded by"
-              actor={record.created_by_name}
+              actor={record.created_by_id}
               timestamp={record.created_at}
             />
             <div className="h-px" style={{ background: "var(--color-border)" }} />
             <ActivityRow
               label="Last updated by"
-              actor={record.updated_by_name}
+              actor={record.updated_by_id}
               timestamp={record.updated_at}
             />
           </div>

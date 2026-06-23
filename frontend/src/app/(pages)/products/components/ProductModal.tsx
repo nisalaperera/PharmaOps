@@ -102,8 +102,10 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
   } = useForm<ProductFormValues>({
     resolver:      zodResolver(productSchema),
     defaultValues: {
-      name: "", generic_id: "", brand_id: "", category_id: "", basic_sku_id: "",
-      barcode: "", specific_instructions: "", sku_mappings: [], is_active: true,
+      name: "", generic_id: null, brand_id: null, category_id: "", basic_sku_id: "",
+      barcode: "", description: "", image: "", specific_instructions: "",
+      is_discount_applicable: false, reorder_level: 0,
+      sku_mappings: [], is_active: true,
     },
   });
 
@@ -161,32 +163,42 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
     if (isOpen) {
       if (isEditing) {
         reset({
-          name:                  editingProduct.name,
-          generic_id:            editingProduct.generic_id,
-          brand_id:              editingProduct.brand_id,
-          category_id:           editingProduct.category_id,
-          basic_sku_id:          editingProduct.basic_sku_id,
-          barcode:               editingProduct.barcode ?? "",
-          specific_instructions: editingProduct.specific_instructions ?? "",
-          sku_mappings:          editingProduct.sku_mappings,
-          is_active:             editingProduct.is_active,
+          name:                   editingProduct.name,
+          generic_id:             editingProduct.generic_id ?? null,
+          brand_id:               editingProduct.brand_id ?? null,
+          category_id:            editingProduct.category_id,
+          basic_sku_id:           editingProduct.basic_sku_id,
+          barcode:                editingProduct.barcode ?? "",
+          description:            editingProduct.description ?? "",
+          image:                  editingProduct.image ?? "",
+          specific_instructions:  editingProduct.specific_instructions ?? "",
+          is_discount_applicable: editingProduct.is_discount_applicable ?? false,
+          reorder_level:          editingProduct.reorder_level ?? 0,
+          sku_mappings:           editingProduct.sku_mappings,
+          is_active:              editingProduct.is_active,
         });
       } else if (isCloning && cloningProduct) {
         reset({
-          name:                  cloningProduct.name,
-          generic_id:            cloningProduct.generic_id,
-          brand_id:              cloningProduct.brand_id,
-          category_id:           cloningProduct.category_id,
-          basic_sku_id:          cloningProduct.basic_sku_id,
-          barcode:               "",
-          specific_instructions: cloningProduct.specific_instructions ?? "",
-          sku_mappings:          cloningProduct.sku_mappings,
-          is_active:             true,
+          name:                   cloningProduct.name,
+          generic_id:             cloningProduct.generic_id ?? null,
+          brand_id:               cloningProduct.brand_id ?? null,
+          category_id:            cloningProduct.category_id,
+          basic_sku_id:           cloningProduct.basic_sku_id,
+          barcode:                "",
+          description:            cloningProduct.description ?? "",
+          image:                  cloningProduct.image ?? "",
+          specific_instructions:  cloningProduct.specific_instructions ?? "",
+          is_discount_applicable: cloningProduct.is_discount_applicable ?? false,
+          reorder_level:          cloningProduct.reorder_level ?? 0,
+          sku_mappings:           cloningProduct.sku_mappings,
+          is_active:              true,
         });
       } else {
         reset({
-          name: "", generic_id: "", brand_id: "", category_id: "", basic_sku_id: "",
-          barcode: "", specific_instructions: "", sku_mappings: [], is_active: true,
+          name: "", generic_id: null, brand_id: null, category_id: "", basic_sku_id: "",
+          barcode: "", description: "", image: "", specific_instructions: "",
+          is_discount_applicable: false, reorder_level: 0,
+          sku_mappings: [], is_active: true,
         });
       }
     }
@@ -204,7 +216,11 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
       const payload = {
         ...data,
         sku_mappings,
+        generic_id:            data.generic_id || null,
+        brand_id:              data.brand_id || null,
         barcode:               data.barcode || undefined,
+        description:           data.description || undefined,
+        image:                 data.image || undefined,
         specific_instructions: data.specific_instructions || undefined,
       };
       return isEditing
@@ -290,10 +306,9 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
               render={({ field }) => (
                 <Autocomplete
                   label="Generic"
-                  required
                   options={generics.map((g) => ({ value: g.id, label: g.name }))}
-                  value={field.value}
-                  onChange={field.onChange}
+                  value={field.value ?? ""}
+                  onChange={(v) => field.onChange(v || null)}
                   placeholder="Search generic…"
                   onCreateNew={(name) => { setNewGenericName(name); setGenericModalOpen(true); }}
                   error={errors.generic_id?.message}
@@ -308,10 +323,9 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
               render={({ field }) => (
                 <Autocomplete
                   label="Brand"
-                  required
                   options={brands.map((b) => ({ value: b.id, label: b.name }))}
-                  value={field.value}
-                  onChange={field.onChange}
+                  value={field.value ?? ""}
+                  onChange={(v) => field.onChange(v || null)}
                   placeholder="Search brand…"
                   onCreateNew={(name) => { setNewBrandName(name); setBrandModalOpen(true); }}
                   error={errors.brand_id?.message}
@@ -360,16 +374,42 @@ export function ProductModal({ isOpen, onClose, editingProduct, cloningProduct =
           </div>
 
           {/* Barcode */}
-          <SectionHeader title="Identification" />
+          <SectionHeader title="Identification & Details" />
 
-          <Input
-            label="Barcode"
-            placeholder="e.g. 9780201379624"
-            error={errors.barcode?.message}
-            {...register("barcode")}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Barcode"
+              placeholder="e.g. 9780201379624"
+              error={errors.barcode?.message}
+              {...register("barcode")}
+            />
+            <Input
+              label="Reorder Level"
+              type="number"
+              placeholder="0"
+              {...register("reorder_level")}
+              error={errors.reorder_level?.message}
+            />
+          </div>
 
-          {/* Specific Instructions */}
+          <div>
+            <label className="form-label">Description</label>
+            <textarea
+              placeholder="Product description"
+              rows={2}
+              className="form-input resize-none"
+              {...register("description")}
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" {...register("is_discount_applicable")}
+                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 w-4 h-4" />
+              <span className="text-sm font-medium" style={{ color: "var(--color-text)" }}>Discount Applicable</span>
+            </label>
+          </div>
+
           <SectionHeader title="Additional Information" />
 
           <div>

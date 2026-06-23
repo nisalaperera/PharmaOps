@@ -105,24 +105,31 @@ class PaymentAllocation(BaseModel):
     amount:     float = Field(gt=0)
 
 
+class CreditNoteAllocation(BaseModel):
+    credit_note_id: str
+    amount:         float = Field(gt=0)
+
+
 class PurchasePaymentCreate(BaseModel):
-    payment_date:   str
-    payment_method: PurchasePaymentMethod
-    reference:      Optional[str] = None
-    allocations:    list[PaymentAllocation] = Field(min_length=1)
+    payment_date:    str
+    payment_method:  PurchasePaymentMethod
+    reference:       Optional[str] = None
+    allocations:     list[PaymentAllocation] = []
+    credit_note_ids: list[str] = []
 
     @model_validator(mode="after")
-    def validate_allocations(self):
-        if not self.allocations:
-            raise ValueError("At least one invoice allocation is required")
+    def validate_has_allocations(self):
+        if not self.allocations and not self.credit_note_ids:
+            raise ValueError("At least one invoice allocation or credit note is required")
         return self
 
 
 class PurchasePaymentResponse(AuditMixin):
-    id:             str
-    payment_date:   str
-    payment_method: PurchasePaymentMethod
-    reference:      Optional[str] = None
-    total_amount:   float = 0
-    allocations:    list[PaymentAllocation] = []
-    created_by:     str = ""
+    id:                      str
+    payment_date:            str
+    payment_method:          PurchasePaymentMethod
+    reference:               Optional[str] = None
+    total_amount:            float = 0
+    allocations:             list[PaymentAllocation] = []
+    credit_note_allocations: list[CreditNoteAllocation] = []
+    created_by:              str = ""

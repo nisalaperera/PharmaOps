@@ -31,7 +31,8 @@ import type { Product, ProductCategory, ProductBrand, ProductGeneric, ProductSku
 
 const CSV_HEADERS = [
   "name", "generic_name", "brand_name", "category_name", "basic_sku_name",
-  "barcode", "specific_instructions", "is_active",
+  "barcode", "description", "specific_instructions", "is_discount_applicable",
+  "reorder_level", "is_active",
 ];
 
 function buildProductRow(product: Product): string[] {
@@ -42,7 +43,10 @@ function buildProductRow(product: Product): string[] {
     product.category_name,
     product.basic_sku_name,
     product.barcode ?? "",
+    product.description ?? "",
     product.specific_instructions ?? "",
+    product.is_discount_applicable ? "TRUE" : "FALSE",
+    String(product.reorder_level ?? 0),
     product.is_active ? "TRUE" : "FALSE",
   ];
 }
@@ -74,7 +78,7 @@ function exportSelectedCsv(selectedProducts: Product[]) {
 
 function exportSelectedPdf(selectedProducts: Product[]) {
   const doc    = new jsPDF();
-  const pdfHeaders = ["Name", "Generic", "Brand", "Category", "Basic SKU", "Barcode", "Instructions", "Status"];
+  const pdfHeaders = ["Name", "Generic", "Brand", "Category", "SKU", "Barcode", "Discount", "Reorder", "Status"];
   const body   = selectedProducts.map(buildProductRow);
   let   yPos   = 16;
 
@@ -312,7 +316,7 @@ export default function ProductsPage() {
           className="text-xs font-mono px-2 py-0.5 rounded"
           style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}
         >
-          {row.basic_sku_name || "â€”"}
+          {row.basic_sku_name || "—"}
         </span>
       ),
     },
@@ -431,7 +435,7 @@ export default function ProductsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search by name, barcode, generic, brand or categoryâ€¦"
+            placeholder="Search by name, barcode, generic, brand or category..."
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />
@@ -629,7 +633,7 @@ export default function ProductsPage() {
         onClose={() => setImportOpen(false)}
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required: name, generic_name, brand_name, category_name, basic_sku_name. Optional: barcode, specific_instructions, is_active (TRUE/FALSE). SKU mappings: sku_map_N_sku, sku_map_N_mapped_to, sku_map_N_qty (N = 1, 2, â€¦)."
+        templateNote="Required: name, generic_name, brand_name, category_name, basic_sku_name. Optional: barcode, specific_instructions, is_active (TRUE/FALSE). SKU mappings: sku_map_N_sku, sku_map_N_mapped_to, sku_map_N_qty (N = 1, 2, ...)."
       />
 
       <ConfirmModal

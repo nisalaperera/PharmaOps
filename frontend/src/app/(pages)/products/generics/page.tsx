@@ -26,7 +26,12 @@ import type { ProductGeneric, ImportResult } from "@/types";
 // â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildGenericRow(generic: ProductGeneric): string[] {
-  return [generic.name, generic.description ?? ""];
+  return [
+    generic.name,
+    generic.dosage_form ?? "",
+    generic.requires_prescription ? "Yes" : "No",
+    generic.description ?? "",
+  ];
 }
 
 function exportDateStamp(): string {
@@ -34,7 +39,7 @@ function exportDateStamp(): string {
 }
 
 function exportGenericsCsv(generics: ProductGeneric[]) {
-  const header  = ["name", "description"];
+  const header  = ["Name", "Dosage Form", "Rx Required", "Description"];
   const rows    = generics.map(buildGenericRow);
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
@@ -44,7 +49,7 @@ function exportGenericsCsv(generics: ProductGeneric[]) {
 
 async function exportGenericsPdf(generics: ProductGeneric[]) {
   const doc     = new jsPDF();
-  const headers = [["Generic Name", "Description"]];
+  const headers = [["Generic Name", "Dosage Form", "Rx Required", "Description"]];
   const body    = generics.map(buildGenericRow);
 
   let cursorY = 14;
@@ -59,7 +64,7 @@ async function exportGenericsPdf(generics: ProductGeneric[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal â€” continue without it.
+    // Logo load failure is non-fatal — continue without it.
   }
 
   doc.setFontSize(13);
@@ -69,7 +74,7 @@ async function exportGenericsPdf(generics: ProductGeneric[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Generics Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Generics Report — ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -206,13 +211,22 @@ export default function GenericsPage() {
       ),
     },
     {
-      key:      "description",
-      header:   "Description",
-      sortable: true,
-      render:   (row) => (
-        <p className="text-sm truncate max-w-[400px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "-"}
-        </p>
+      key:    "dosage_form",
+      header: "Dosage Form",
+      render: (row) => (
+        <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          {row.dosage_form ? row.dosage_form.charAt(0) + row.dosage_form.slice(1).toLowerCase() : "—"}
+        </span>
+      ),
+    },
+    {
+      key:    "requires_prescription",
+      header: "Rx",
+      width:  "60px",
+      render: (row) => (
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${row.requires_prescription ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+          {row.requires_prescription ? "Yes" : "No"}
+        </span>
       ),
     },
     {
@@ -296,7 +310,7 @@ export default function GenericsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search genericsâ€¦"
+            placeholder="Search generics..."
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -459,7 +473,7 @@ export default function GenericsPage() {
         entityName="Generics"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required: name. Optional: description."
+        templateNote="Required: name. Optional: description, dosage_form, requires_prescription."
       />
 
       <ConfirmModal

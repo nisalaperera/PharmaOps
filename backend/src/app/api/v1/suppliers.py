@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, HTTPException, status, Depends, Query, UploadFile, File
+from fastapi import APIRouter, HTTPException, status, Depends, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from datetime import datetime, timezone
 import csv, io, re
@@ -11,26 +11,23 @@ from app.models.common import PaginatedResponse
 
 router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 
-SUPPLIER_SORT_FIELDS = {"short_name", "legal_name", "created_at"}
+SUPPLIER_SORT_FIELDS = {"name", "legal_name", "created_at"}
 
 
 def _denormalize_agency_names(db, distributor_channels: list) -> list:
-    """Fills agency_name on DistributorChannels where channel_category is AGENCY."""
     for ch in distributor_channels:
         if isinstance(ch, dict):
             if ch.get("channel_category") == "AGENCY" and ch.get("agency_id"):
                 agency_doc = db[Collections.SUPPLIERS].find_one({"_id": ch["agency_id"]})
                 if agency_doc:
-                    ch["agency_name"] = agency_doc.get("short_name", "")
+                    ch["agency_name"] = agency_doc.get("name", agency_doc.get("short_name", ""))
         else:
             if ch.channel_category == "AGENCY" and ch.agency_id:
                 agency_doc = db[Collections.SUPPLIERS].find_one({"_id": ch.agency_id})
                 if agency_doc:
-                    ch.agency_name = agency_doc.get("short_name", "")
+                    ch.agency_name = agency_doc.get("name", agency_doc.get("short_name", ""))
     return distributor_channels
 
-
-# Agencies list (for Distributor channel dropdowns) BEFORE /{id}
 
 @router.get("/agencies")
 async def list_agencies(
@@ -39,12 +36,10 @@ async def list_agencies(
     db   = get_db()
     docs = db[Collections.SUPPLIERS].find(
         {"supplier_type": "AGENCY", "is_active": True},
-        {"_id": 1, "short_name": 1},
-    ).sort("short_name", 1)
-    return [{"id": str(d["_id"]), "short_name": d.get("short_name", "")} for d in docs]
+        {"_id": 1, "name": 1, "short_name": 1},
+    ).sort("name", 1)
+    return [{"id": str(d["_id"]), "name": d.get("name", d.get("short_name", ""))} for d in docs]
 
-
-# List
 
 @router.get("", response_model=PaginatedResponse[SupplierResponse])
 async def list_suppliers(
@@ -53,7 +48,7 @@ async def list_suppliers(
     search:        str | None       = Query(default=None),
     is_active:     bool | None      = Query(default=None),
     supplier_type: SupplierType | None = Query(default=None),
-    sort_by:       str | None       = Query(default="short_name"),
+    sort_by:       str | None       = Query(default="name"),
     sort_dir:      str | None       = Query(default="asc"),
     current_user:  dict = Depends(get_current_user),
 ):
@@ -64,9 +59,9 @@ async def list_suppliers(
     if supplier_type:
         filter["supplier_type"] = supplier_type
     if search:
-        filter.update(build_search_filter(search, ["short_name", "legal_name", "registration_number"]))
+        filter.update(build_search_filter(search, ["name", "short_name", "legal_name", "registration_number"]))
 
-    sort_field     = sort_by if sort_by in SUPPLIER_SORT_FIELDS else "short_name"
+    sort_field     = sort_by if sort_by in SUPPLIER_SORT_FIELDS else "name"
     sort_direction = -1 if sort_dir == "desc" else 1
 
     total = db[Collections.SUPPLIERS].count_documents(filter)
@@ -86,8 +81,6 @@ async def list_suppliers(
     )
 
 
-# Export CSV must appear BEFORE /{supplier_id}
-
 @router.get("/export")
 async def export_suppliers(
     search:        str | None       = Query(default=None),
@@ -102,12 +95,12 @@ async def export_suppliers(
     if supplier_type:
         filter["supplier_type"] = supplier_type
     if search:
-        filter.update(build_search_filter(search, ["short_name", "legal_name", "registration_number"]))
+        filter.update(build_search_filter(search, ["name", "short_name", "legal_name", "registration_number"]))
 
-    docs   = db[Collections.SUPPLIERS].find(filter).sort("short_name", 1)
+    docs   = db[Collections.SUPPLIERS].find(filter).sort("name", 1)
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Short Name", "Legal Name", "Type", "Registration Number", "Channels", "Status"])
+    writer.writerow(["Name", "Legal Name", "Type", "Registration Number", "Credit Term Days", "Credit Limit", "Channels", "Status"])
     for doc in docs:
         d = doc_to_dict(doc)
         channels_count = (
@@ -115,10 +108,12 @@ async def export_suppliers(
             else len(d.get("distributor_channels", []))
         )
         writer.writerow([
-            d.get("short_name", ""),
+            d.get("name", d.get("short_name", "")),
             d.get("legal_name", ""),
             d.get("supplier_type", ""),
             d.get("registration_number", ""),
+            d.get("credit_term_days", 30),
+            d.get("credit_limit") or "",
             channels_count,
             "Active" if d.get("is_active") else "Inactive",
         ])
@@ -131,13 +126,12 @@ async def export_suppliers(
     )
 
 
-# â”€â”€ Import template must appear BEFORE /{supplier_id}
-
 @router.get("/import/template")
 async def get_import_template(current_user: dict = Depends(get_current_user)):
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["short_name", "legal_name", "supplier_type", "registration_number"])
+    writer.writerow(["name", "legal_name", "supplier_type", "registration_number", "credit_term_days", "credit_limit"])
+    writer.writerow(["ABC Pharma", "ABC Pharmaceuticals Ltd", "DISTRIBUTOR", "REG-001", "30", "500000"])
     output.seek(0)
     return StreamingResponse(
         iter([output.getvalue()]),
@@ -145,8 +139,6 @@ async def get_import_template(current_user: dict = Depends(get_current_user)):
         headers={"Content-Disposition": "attachment; filename=suppliers_import_template.csv"},
     )
 
-
-# â”€â”€ Import CSV must appear BEFORE /{supplier_id}
 
 @router.post("/import")
 async def import_suppliers(
@@ -173,42 +165,56 @@ async def import_suppliers(
 
     for i, row in enumerate(reader, start=2):
         try:
-            short_name    = (row.get("short_name") or "").strip()
+            name          = (row.get("name") or row.get("short_name") or "").strip()
             legal_name    = (row.get("legal_name") or "").strip()
             supplier_type = (row.get("supplier_type") or "DISTRIBUTOR").strip().upper()
             reg_number    = (row.get("registration_number") or "").strip() or None
+            credit_raw    = (row.get("credit_term_days") or "").strip()
+            credit_term   = int(credit_raw) if credit_raw.isdigit() else 30
+            limit_raw     = (row.get("credit_limit") or "").strip()
+            credit_limit  = float(limit_raw) if limit_raw else None
 
-            if not short_name:
-                raise ValueError("short_name is required")
+            if not name:
+                raise ValueError("name is required")
             if not legal_name:
                 raise ValueError("legal_name is required")
             if supplier_type not in ("AGENCY", "DISTRIBUTOR"):
                 supplier_type = "DISTRIBUTOR"
 
             now      = datetime.now(timezone.utc).isoformat()
-            existing = db[Collections.SUPPLIERS].find_one(
-                {"short_name": {"$regex": f"^{re.escape(short_name)}$", "$options": "i"}}
-            )
+            existing = db[Collections.SUPPLIERS].find_one({
+                "$or": [
+                    {"name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}},
+                    {"short_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}},
+                ]
+            })
             if existing:
                 db[Collections.SUPPLIERS].update_one(
                     {"_id": existing["_id"]},
                     {"$set": {
-                        "short_name": short_name,
+                        "name": name,
                         "legal_name": legal_name,
                         "registration_number": reg_number,
+                        "credit_term_days": credit_term,
+                        "credit_limit": credit_limit,
                         "updated_at": now,
+                        **audit_update_fields(current_user),
                     }},
                 )
                 updated += 1
             else:
                 supplier_id = new_id()
-                channels_field = "agency_channels" if supplier_type == "AGENCY" else "distributor_channels"
                 data = {
                     "_id":                  supplier_id,
                     "supplier_type":        supplier_type,
-                    "short_name":           short_name,
+                    "name":                 name,
                     "legal_name":           legal_name,
                     "registration_number":  reg_number,
+                    "contacts":             [],
+                    "credit_term_days":     credit_term,
+                    "credit_limit":         credit_limit,
+                    "outstanding_balance":  0,
+                    "notes":                None,
                     "agency_channels":      [],
                     "distributor_channels": [],
                     "expiry_alert_configs": [],
@@ -225,8 +231,6 @@ async def import_suppliers(
 
     return {"created": created, "updated": updated, "failed": failed, "errors": errors}
 
-
-# â”€â”€ Create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.post("", response_model=SupplierResponse, status_code=status.HTTP_201_CREATED)
 async def create_supplier(
@@ -257,8 +261,6 @@ async def create_supplier(
     return SupplierResponse(**doc_to_dict(doc))
 
 
-# â”€â”€ Get one â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 @router.get("/{supplier_id}", response_model=SupplierResponse)
 async def get_supplier(
     supplier_id:  str,
@@ -270,8 +272,6 @@ async def get_supplier(
         raise HTTPException(status_code=404, detail="Supplier not found")
     return SupplierResponse(**doc_to_dict(doc))
 
-
-# â”€â”€ Update â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 @router.patch("/{supplier_id}", response_model=SupplierResponse)
 async def update_supplier(
@@ -300,4 +300,3 @@ async def update_supplier(
     )
     updated = db[Collections.SUPPLIERS].find_one({"_id": supplier_id})
     return SupplierResponse(**doc_to_dict(updated))
-

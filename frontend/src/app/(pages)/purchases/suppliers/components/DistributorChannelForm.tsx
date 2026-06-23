@@ -64,7 +64,7 @@ export function DistributorChannelForm({ index, control, register, errors }: Dis
             >
               <option value="">Select agency…</option>
               {agencies.map((a) => (
-                <option key={a.id} value={a.id}>{a.short_name}</option>
+                <option key={a.id} value={a.id}>{a.name}</option>
               ))}
             </select>
             {channelErrors?.agency_id?.message && (

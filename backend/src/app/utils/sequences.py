@@ -42,5 +42,5 @@ def generate_document_number(
 
 
 def get_branch_code(db: Database, branch_id: str) -> str:
-    branch = db[Collections.BRANCHES].find_one({"_id": branch_id}, {"code": 1})
-    return branch["code"] if branch and branch.get("code") else "XX"
+    branch = db[Collections.BRANCHES].find_one({"_id": branch_id}, {"branch_prefix": 1})
+    return branch["branch_prefix"] if branch and branch.get("branch_prefix") else "XX"

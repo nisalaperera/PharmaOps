@@ -8,6 +8,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Modal }    from "@/components/ui/Modal";
 import { Button }   from "@/components/ui/Button";
 import { Input }    from "@/components/ui/Input";
+import { FormattedInput } from "@/components/ui/FormattedInput";
 import { Autocomplete } from "@/components/ui/Autocomplete";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { showToast }      from "@/lib/toast";
@@ -206,12 +207,12 @@ export function StockTransferModal({ isOpen, onClose }: StockTransferModalProps)
                   name={`items.${index}.quantity`}
                   control={control}
                   render={({ field: f }) => (
-                    <input
-                      type="number"
+                    <FormattedInput
+                      format="quantity"
                       min={1}
-                      className="form-input text-sm text-right"
-                      value={f.value || ""}
-                      onChange={(e) => f.onChange(parseInt(e.target.value, 10) || 0)}
+                      className="text-sm"
+                      value={f.value}
+                      onChange={f.onChange}
                     />
                   )}
                 />

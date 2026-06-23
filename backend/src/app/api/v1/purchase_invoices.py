@@ -27,7 +27,7 @@ def _resolve_supplier(db, supplier_id: str, channel_id: str) -> tuple[str, str, 
     supplier_doc = db[Collections.SUPPLIERS].find_one({"_id": supplier_id})
     if not supplier_doc:
         return "", "", 30
-    supplier_name    = supplier_doc.get("short_name", "")
+    supplier_name    = supplier_doc.get("name", supplier_doc.get("short_name", ""))
     channel_name     = ""
     credit_term_days = 30
     channels = supplier_doc.get("distributor_channels", []) + supplier_doc.get("agency_channels", [])
@@ -63,6 +63,19 @@ def _compute_amounts(payload_dict: dict) -> tuple[list, list, float, float]:
 def _generate_invoice_number(db, branch_id: str, invoice_date: str) -> str:
     branch_code = get_branch_code(db, branch_id)
     return generate_document_number(db, branch_code, "PI", ref_date=invoice_date)
+
+
+def _sync_supplier_balance(db, supplier_id: str) -> None:
+    pipeline = [
+        {"$match": {"supplier_id": supplier_id}},
+        {"$group": {"_id": None, "total": {"$sum": {"$subtract": ["$net_amount", "$paid_amount"]}}}},
+    ]
+    agg = list(db[Collections.PURCHASE_INVOICES].aggregate(pipeline))
+    outstanding = round(agg[0]["total"], 2) if agg else 0
+    db[Collections.SUPPLIERS].update_one(
+        {"_id": supplier_id},
+        {"$set": {"outstanding_balance": max(outstanding, 0), "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
 
 
 def _payment_status(net_amount: float, paid: float) -> str:
@@ -292,6 +305,7 @@ async def create_purchase_invoice(
         data["verified_at"]      = now
 
     db[Collections.PURCHASE_INVOICES].insert_one(data)
+    _sync_supplier_balance(db, payload.supplier_id)
 
     if payload.purchase_order_id:
         db[Collections.PURCHASE_ORDERS].update_one(
@@ -470,16 +484,67 @@ async def create_purchase_payment(
             }},
         )
 
+    supplier_ids = {doc.get("supplier_id") for doc in invoices.values() if doc.get("supplier_id")}
+    credit_note_allocations = []
+    for cn_id in (payload.credit_note_ids or []):
+        cn_doc = db[Collections.PURCHASE_CREDIT_NOTES].find_one({"_id": cn_id})
+        if not cn_doc:
+            raise HTTPException(status_code=404, detail=f"Credit note {cn_id} not found")
+        if cn_doc.get("status") != "APPROVED":
+            raise HTTPException(status_code=400, detail=f"Credit note {cn_doc.get('credit_note_number', cn_id)} is not in APPROVED status")
+
+        cn_branch = cn_doc.get("branch_id", "")
+        for item in cn_doc.get("items", []):
+            inv_doc = db[Collections.INVENTORY].find_one({
+                "product_id": item.get("product_id"),
+                "branch_id": cn_branch,
+            })
+            if inv_doc:
+                batches = list(inv_doc.get("batches", []))
+                batch = next((b for b in batches if b["batch_number"] == item.get("batch_number")), None)
+                if batch:
+                    batch["quantity"] = max(0, batch["quantity"] - item.get("quantity", 0))
+                batches = [b for b in batches if b["quantity"] > 0]
+                total_qty = sum(b["quantity"] for b in batches)
+                is_low = total_qty <= inv_doc.get("min_stock_level", 0)
+                db[Collections.INVENTORY].update_one(
+                    {"_id": inv_doc["_id"]},
+                    {"$set": {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low, "updated_at": now}},
+                )
+
+        cn_amount = cn_doc.get("total_amount", 0)
+        credit_note_allocations.append({"credit_note_id": cn_id, "amount": cn_amount})
+
+        db[Collections.PURCHASE_CREDIT_NOTES].update_one(
+            {"_id": cn_id},
+            {"$set": {
+                "status": "APPLIED",
+                "applied_payment_id": payment_id,
+                "applied_at": now,
+                "inventory_deducted": True,
+                "updated_at": now,
+                **audit_update_fields(current_user),
+            }},
+        )
+
+        cn_supplier = cn_doc.get("supplier_id")
+        if cn_supplier:
+            supplier_ids.add(cn_supplier)
+
+    for sid in supplier_ids:
+        _sync_supplier_balance(db, sid)
+
     payment_doc = {
-        "_id":            payment_id,
-        "payment_date":   payload.payment_date,
-        "payment_method": payload.payment_method,
-        "reference":      payload.reference,
-        "total_amount":   total_amount,
-        "allocations":    [a.model_dump() for a in payload.allocations],
-        "created_by":     current_user["id"],
-        "created_at":     now,
-        "updated_at":     now,
+        "_id":                      payment_id,
+        "payment_date":             payload.payment_date,
+        "payment_method":           payload.payment_method,
+        "reference":                payload.reference,
+        "total_amount":             total_amount,
+        "allocations":              [a.model_dump() for a in payload.allocations],
+        "credit_note_allocations":  credit_note_allocations,
+        "created_by":               current_user["id"],
+        "created_at":               now,
+        "updated_at":               now,
         **audit_create_fields(current_user),
     }
     db[Collections.PURCHASE_PAYMENTS].insert_one(payment_doc)

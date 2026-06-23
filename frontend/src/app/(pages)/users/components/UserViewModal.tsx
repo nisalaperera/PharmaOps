@@ -129,13 +129,13 @@ export function UserViewModal({ isOpen, onClose, user }: UserViewModalProps) {
           >
             <ActivityRow
               label="Created by"
-              actor={user.created_by_name}
+              actor={user.created_by_id}
               timestamp={formatDateTime(user.created_at)}
             />
             <div className="h-px" style={{ background: "var(--color-border)" }} />
             <ActivityRow
               label="Last updated by"
-              actor={user.updated_by_name}
+              actor={user.updated_by_id}
               timestamp={formatDateTime(user.updated_at)}
             />
           </div>

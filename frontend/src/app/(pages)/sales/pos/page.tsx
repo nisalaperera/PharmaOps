@@ -142,7 +142,7 @@ export default function PosPage() {
     enabled:   debouncedSearch.length >= 2,
     staleTime: 30_000,
   });
-  const inventoryResults = (inventoryData?.data ?? []).filter(i => i.total_quantity > 0);
+  const inventoryResults = (inventoryData?.data ?? []).filter(i => i.basic_sku_total_quantity > 0);
 
   const { data: customersData } = useQuery({
     queryKey: ["pos-customers", debouncedCustomerSearch],
@@ -257,7 +257,7 @@ export default function PosPage() {
         productName:   inv.product_name,
         batchNumber:   batch.batch_number,
         expiryDate:    batch.expiry_date,
-        unitPrice:     batch.selling_price,
+        unitPrice:     batch.basic_sku_selling_price,
         maxQty:        batch.quantity,
         quantity:      1,
         discount:      0,
@@ -486,12 +486,12 @@ export default function PosPage() {
                     <div>
                       <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>{inv.product_name}</p>
                       <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-                        Batch: {batch?.batch_number} · Exp: {batch?.expiry_date} · Stock: {inv.total_quantity}
+                        Batch: {batch?.batch_number} · Exp: {batch?.expiry_date} · Stock: {inv.basic_sku_total_quantity}
                       </p>
                     </div>
                     <div className="text-right ml-4 flex-shrink-0">
                       <p className="text-sm font-bold tabular-nums" style={{ color: "var(--color-text)" }}>
-                        {formatAmount(batch?.selling_price ?? 0)}
+                        {formatAmount(batch?.basic_sku_selling_price ?? 0)}
                       </p>
                       <p className="text-xs" style={{ color: "var(--color-text-muted)" }}>per unit</p>
                     </div>

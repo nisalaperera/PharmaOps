@@ -266,7 +266,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
                   label={<>Supplier <span className="text-danger-500">*</span></>}
                   value={field.value}
                   onChange={field.onChange}
-                  options={suppliers.map((s) => ({ value: s.id, label: s.short_name }))}
+                  options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
                   placeholder="Search supplier…"
                   isLoading={isOpen && !suppliersData}
                   error={form.formState.errors.supplier_id?.message}

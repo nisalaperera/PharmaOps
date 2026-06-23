@@ -17,7 +17,7 @@ import { useAuth }                   from "@/hooks/useAuth";
 import { PURCHASE_INVOICE_STATUS_OPTIONS } from "@/lib/constants";
 import { purchaseInvoiceSchema, type PurchaseInvoiceValues } from "../schemas";
 import type {
-  PurchaseInvoice, PurchaseOrder, Supplier, Product, Branch, PaginatedResponse,
+  PurchaseInvoice, PurchaseOrder, Supplier, Product, ProductCategory, Branch, PaginatedResponse,
 } from "@/types";
 
 interface PurchaseInvoiceModalProps {
@@ -70,6 +70,12 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
     queryKey: ["products-select"],
     queryFn:  () => apiGet<PaginatedResponse<Product>>("/products", { is_active: "true", page_size: 500 }),
     enabled:  isOpen,
+  });
+  const { data: categoriesData = [] } = useQuery<ProductCategory[]>({
+    queryKey: ["categories"],
+    queryFn:  () => apiGet<ProductCategory[]>("/products/categories"),
+    enabled:  isOpen,
+    staleTime: 5 * 60 * 1000,
   });
   const { data: poData } = useQuery<PaginatedResponse<PurchaseOrder>>({
     queryKey: ["purchase-orders-convertible"],
@@ -136,6 +142,14 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
       unit_quantity: it.unit_quantity, unit_price: it.unit_price,
     })));
   }, [watchedPoId, convertePOs.length]);
+
+  // ── Margin helper ────────────────────────────────────────────────────────
+  function getEffectiveMarginForProduct(productId: string): number | null {
+    const product = products.find((p) => p.id === productId);
+    if (!product) return null;
+    const category = categoriesData.find((c) => c.id === product.category_id);
+    return category?.effective_margin_percentage ?? null;
+  }
 
   // ── Item helpers ──────────────────────────────────────────────────────────
   function handleProductSelect(index: number, productId: string) {
@@ -250,7 +264,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
                 label={<>Distributor <span className="text-danger-500">*</span></>}
                 value={field.value}
                 onChange={field.onChange}
-                options={suppliers.map((s) => ({ value: s.id, label: s.short_name }))}
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
                 placeholder="Search distributor…"
                 isLoading={isOpen && !suppliersData}
                 error={form.formState.errors.supplier_id?.message}
@@ -324,7 +338,23 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
                       <Input type="number" min={1} {...form.register(`items.${index}.unit_quantity`, { valueAsNumber: true })} error={errs?.unit_quantity?.message} />
                       <Input type="number" min={0} {...form.register(`items.${index}.free_quantity`, { valueAsNumber: true })} />
                       <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.discount`, { valueAsNumber: true })} />
-                      <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.unit_price`, { valueAsNumber: true })} error={errs?.unit_price?.message} />
+                      <Input type="number" min={0} step="0.01"
+                        {...form.register(`items.${index}.unit_price`, {
+                          valueAsNumber: true,
+                          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                            const unitPrice = parseFloat(e.target.value) || 0;
+                            const currentSelling = Number(form.getValues(`items.${index}.selling_price`)) || 0;
+                            if (unitPrice > 0 && currentSelling === 0) {
+                              const productId = form.getValues(`items.${index}.product_id`);
+                              const margin = getEffectiveMarginForProduct(productId);
+                              if (margin != null) {
+                                form.setValue(`items.${index}.selling_price`, Math.round(unitPrice * (1 + margin / 100) * 100) / 100);
+                              }
+                            }
+                          },
+                        })}
+                        error={errs?.unit_price?.message}
+                      />
                       <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.selling_price`, { valueAsNumber: true })} />
                       <div className="h-9 flex items-center justify-end px-2 rounded-md text-sm tabular-nums" style={{ background: "var(--color-surface-2)", color: "var(--color-text-muted)" }}>{formatAmount(line)}</div>
                       <div className="flex items-center justify-center h-9">

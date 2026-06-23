@@ -26,7 +26,7 @@ import type { ProductBrand, ImportResult } from "@/types";
 // â”€â”€â”€ Export helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildBrandRow(brand: ProductBrand): string[] {
-  return [brand.name, brand.manufacturer_name ?? ""];
+  return [brand.name, brand.manufacturer_name ?? "", brand.country ?? "", brand.return_expiry_before != null ? String(brand.return_expiry_before) : ""];
 }
 
 function exportDateStamp(): string {
@@ -34,7 +34,7 @@ function exportDateStamp(): string {
 }
 
 function exportBrandsCsv(brands: ProductBrand[]) {
-  const header  = ["name", "manufacturer_name"];
+  const header  = ["Name", "Manufacturer", "Country", "Return Before (days)"];
   const rows    = brands.map(buildBrandRow);
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
@@ -44,7 +44,7 @@ function exportBrandsCsv(brands: ProductBrand[]) {
 
 async function exportBrandsPdf(brands: ProductBrand[]) {
   const doc     = new jsPDF();
-  const headers = [["Brand Name", "Manufacturer"]];
+  const headers = [["Brand Name", "Manufacturer", "Country", "Return Before (days)"]];
   const body    = brands.map(buildBrandRow);
 
   let cursorY = 14;
@@ -59,7 +59,7 @@ async function exportBrandsPdf(brands: ProductBrand[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal â€” continue without it.
+    // Logo load failure is non-fatal — continue without it.
   }
 
   doc.setFontSize(13);
@@ -69,7 +69,7 @@ async function exportBrandsPdf(brands: ProductBrand[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Brands Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Brands Report — ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -211,7 +211,16 @@ export default function BrandsPage() {
       sortable: true,
       render:   (row) => (
         <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.manufacturer_name || "â€”"}
+          {row.manufacturer_name || "—"}
+        </p>
+      ),
+    },
+    {
+      key:    "country",
+      header: "Country",
+      render: (row) => (
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+          {row.country || "—"}
         </p>
       ),
     },
@@ -296,7 +305,7 @@ export default function BrandsPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search brandsâ€¦"
+            placeholder="Search brands..."
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -459,7 +468,7 @@ export default function BrandsPage() {
         entityName="Brands"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required: name. Optional: manufacturer_name."
+        templateNote="Required: name. Optional: manufacturer_name, country, return_expiry_before."
       />
 
       <ConfirmModal

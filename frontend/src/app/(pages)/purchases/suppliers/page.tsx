@@ -41,7 +41,7 @@ function channelsCount(s: Supplier): number {
 
 function buildRow(s: Supplier): string[] {
   return [
-    s.short_name,
+    s.name,
     s.legal_name,
     SUPPLIER_TYPE_LABEL[s.supplier_type],
     s.registration_number ?? "",
@@ -51,7 +51,7 @@ function buildRow(s: Supplier): string[] {
 }
 
 function exportSelectedCsv(selected: Supplier[]) {
-  const header  = ["Short Name", "Legal Name", "Type", "Registration Number", "Channels", "Status"];
+  const header  = ["Name", "Legal Name", "Type", "Registration Number", "Channels", "Status"];
   const rows    = selected.map(buildRow);
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
@@ -62,7 +62,7 @@ function exportSelectedCsv(selected: Supplier[]) {
 
 async function exportSelectedPdf(selected: Supplier[]) {
   const doc  = new jsPDF();
-  const head = [["Short Name", "Legal Name", "Type", "Registration Number", "Channels", "Status"]];
+  const head = [["Name", "Legal Name", "Type", "Registration Number", "Channels", "Status"]];
   const body = selected.map(buildRow);
 
   let cursorY = 14;
@@ -87,7 +87,7 @@ async function exportSelectedPdf(selected: Supplier[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Supplier Report â€” " + exportDateStamp(), 14, cursorY + 4);
+  doc.text("Supplier Report — " + exportDateStamp(), 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -100,12 +100,12 @@ export default function SuppliersPage() {
   const { permissions } = useAuth();
   const canManage = (permissions?.can("BRANCH_MANAGER")) ?? false;
 
-  // â€” Filters
+  // — Filters
   const [statusFilter,       setStatusFilter]       = useState("");
   const [supplierTypeFilter, setSupplierTypeFilter] = useState<SupplierType | "">("");
   const [filterVisible,      setFilterVisible]      = useState(false);
 
-  // â€” Modal state
+  // — Modal state
   const [modalOpen,          setModalOpen]          = useState(false);
   const [editingSupplier,    setEditingSupplier]    = useState<Supplier | null>(null);
   const [viewSupplier,       setViewSupplier]       = useState<Supplier | null>(null);
@@ -113,14 +113,14 @@ export default function SuppliersPage() {
   const [confirmSupplier,    setConfirmSupplier]    = useState<Supplier | null>(null);
   const [importOpen,         setImportOpen]         = useState(false);
 
-  // â€” Row selection + export
+  // — Row selection + export
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
-  // â€” Pagination
+  // — Pagination
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
-    usePagination({ initialSortField: "short_name" });
+    usePagination({ initialSortField: "name" });
 
   const filters = {
     ...(statusFilter       && { is_active:     statusFilter }),
@@ -141,7 +141,7 @@ export default function SuppliersPage() {
     setFilterVisible(false);
   }
 
-  // â€” Data
+  // — Data
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<PaginatedResponse<Supplier>>({
@@ -154,7 +154,7 @@ export default function SuppliersPage() {
   const totalItems = data?.total       ?? 0;
   const totalPages = data?.total_pages ?? 1;
 
-  // â€” Toggle status mutation
+  // — Toggle status mutation
   const toggleStatusMutation = useMutation({
     mutationFn: (supplier: Supplier) =>
       apiPatch<Supplier>(`/suppliers/${supplier.id}`, { is_active: !supplier.is_active }),
@@ -164,8 +164,8 @@ export default function SuppliersPage() {
         "success",
         supplier.is_active ? "Supplier Deactivated" : "Supplier Activated",
         supplier.is_active
-          ? `${supplier.short_name} has been deactivated.`
-          : `${supplier.short_name} is now active.`,
+          ? `${supplier.name} has been deactivated.`
+          : `${supplier.name} is now active.`,
       );
       setConfirmSupplier(null);
     },
@@ -174,7 +174,7 @@ export default function SuppliersPage() {
     },
   });
 
-  // â€” Selection helpers
+  // — Selection helpers
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
     setAllPagesSelected(false);
@@ -190,7 +190,7 @@ export default function SuppliersPage() {
   const selectedItems  = items.filter((i) => selectedKeys.has(i.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // â€” Export handlers
+  // — Export handlers
   async function handleExportCsv() {
     if (allPagesSelected) {
       setIsExportingCsv(true);
@@ -226,16 +226,16 @@ export default function SuppliersPage() {
     downloadBlob(blob, "suppliers_import_template.csv");
   }
 
-  // â€” Columns
+  // — Columns
   const columns: Column<Supplier>[] = [
     {
-      key:      "short_name",
+      key:      "name",
       header:   "Supplier",
       sortable: true,
       render:   (row) => (
         <div>
           <p className="text-sm font-semibold" style={{ color: "var(--color-text)" }}>
-            {row.short_name}
+            {row.name}
           </p>
           <p className="text-xs mt-0.5" style={{ color: "var(--color-text-muted)" }}>
             {row.legal_name}
@@ -354,7 +354,7 @@ export default function SuppliersPage() {
           </Button>
 
           <SearchBar
-            placeholder="Search by name or registrationâ€¦"
+            placeholder="Search by name or registration..."
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />
@@ -524,7 +524,7 @@ export default function SuppliersPage() {
         entityName="Suppliers"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required columns: short_name, legal_name. Optional: supplier_type (AGENCY/DISTRIBUTOR), registration_number"
+        templateNote="Required columns: name, legal_name. Optional: supplier_type (AGENCY/DISTRIBUTOR), registration_number"
       />
 
       <ConfirmModal
@@ -535,13 +535,13 @@ export default function SuppliersPage() {
           isDeactivating ? (
             <>Are you sure you want to deactivate{" "}
               <span className="font-semibold" style={{ color: "var(--color-text)" }}>
-                {confirmSupplier?.short_name}
+                {confirmSupplier?.name}
               </span>? Distributor channels will be hidden from purchase orders.
             </>
           ) : (
             <>Are you sure you want to activate{" "}
               <span className="font-semibold" style={{ color: "var(--color-text)" }}>
-                {confirmSupplier?.short_name}
+                {confirmSupplier?.name}
               </span>?
             </>
           )

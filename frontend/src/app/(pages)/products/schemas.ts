@@ -11,15 +11,19 @@ export const skuMappingSchema = z.object({
 });
 
 export const productSchema = z.object({
-  name:                  z.string().min(1, "Product name is required").max(200),
-  generic_id:            z.string().min(1, "Generic is required"),
-  brand_id:              z.string().min(1, "Brand is required"),
-  category_id:           z.string().min(1, "Category is required"),
-  basic_sku_id:          z.string().min(1, "Basic SKU is required"),
-  barcode:               z.string().optional(),
-  specific_instructions: z.string().optional().nullable(),
-  sku_mappings:          z.array(skuMappingSchema),
-  is_active:             z.boolean(),
+  name:                   z.string().min(1, "Product name is required").max(200),
+  generic_id:             z.string().optional().nullable(),
+  brand_id:               z.string().optional().nullable(),
+  category_id:            z.string().min(1, "Category is required"),
+  basic_sku_id:           z.string().min(1, "Basic SKU is required"),
+  barcode:                z.string().optional(),
+  description:            z.string().optional().nullable(),
+  image:                  z.string().optional().nullable(),
+  specific_instructions:  z.string().optional().nullable(),
+  is_discount_applicable: z.boolean(),
+  reorder_level:          z.coerce.number().int().nonnegative().default(0),
+  sku_mappings:           z.array(skuMappingSchema),
+  is_active:              z.boolean(),
 });
 
 export type SkuMappingFormValue = z.infer<typeof skuMappingSchema>;

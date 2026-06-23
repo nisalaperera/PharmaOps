@@ -130,10 +130,10 @@ export function PosMachineViewModal({ isOpen, onClose, machine, canManage }: Pos
               {formatDateTime(machine.created_at)}
             </dd>
           </div>
-          {machine.created_by_name && (
+          {machine.created_by_id && (
             <div>
               <dt className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Created By</dt>
-              <dd className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>{machine.created_by_name}</dd>
+              <dd className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>{machine.created_by_id}</dd>
             </div>
           )}
         </dl>
@@ -327,7 +327,7 @@ export function PosMachineViewModal({ isOpen, onClose, machine, canManage }: Pos
                           </td>
                           <td>
                             <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-                              {s.created_by_name || "—"}
+                              {s.created_by_id || "—"}
                             </span>
                           </td>
                         </tr>

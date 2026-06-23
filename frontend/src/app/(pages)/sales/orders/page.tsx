@@ -42,7 +42,7 @@ function buildRow(order: SalesOrder): string[] {
     String(order.items.length),
     `LKR ${formatAmount(order.total_amount)}`,
     SALES_ORDER_STATUS_LABEL[order.status],
-    order.created_by_name,
+    order.created_by,
   ];
 }
 

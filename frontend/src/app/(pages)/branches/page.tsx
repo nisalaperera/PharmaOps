@@ -31,14 +31,14 @@ function buildBranchRow(branch: Branch): string[] {
   return [
     branch.name,
     branch.address,
-    branch.phone,
     branch.license_number,
+    branch.branch_prefix ?? "",
     branch.is_active ? "Active" : "Inactive",
   ];
 }
 
 function exportSelectedCsv(selectedBranches: Branch[]) {
-  const header  = ["Branch", "Address", "Phone", "License No.", "Status"];
+  const header  = ["Branch", "Address", "License No.", "Prefix", "Status"];
   const rows    = selectedBranches.map(buildBranchRow);
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
@@ -49,7 +49,7 @@ function exportSelectedCsv(selectedBranches: Branch[]) {
 
 function exportSelectedPdf(selectedBranches: Branch[]) {
   const doc  = new jsPDF();
-  const head = [["Branch", "Address", "Phone", "License No.", "Status"]];
+  const head = [["Branch", "Address", "License No.", "Prefix", "Status"]];
   const body = selectedBranches.map(buildBranchRow);
   doc.setFontSize(14);
   doc.text("Branches — Selected Records", 14, 16);
@@ -201,13 +201,6 @@ export default function BranchesPage() {
             {row.address}
           </p>
         </div>
-      ),
-    },
-    {
-      key:    "phone",
-      header: "Phone",
-      render: (row) => (
-        <span className="text-sm" style={{ color: "var(--color-text)" }}>{row.phone}</span>
       ),
     },
     {
@@ -475,7 +468,7 @@ export default function BranchesPage() {
         entityName="Branches"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadBranchTemplate}
-        templateNote="Required columns: name, address, phone, license_number. Optional: is_active (TRUE/FALSE, defaults to TRUE)."
+        templateNote="Required columns: name, address, license_number. Optional: branch_prefix, is_active (TRUE/FALSE, defaults to TRUE)."
       />
 
       <ConfirmModal

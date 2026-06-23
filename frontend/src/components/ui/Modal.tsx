@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type ModalSize = "sm" | "md" | "lg" | "xl" | "full";
+type ModalSize = "sm" | "md" | "lg" | "xl" | "half" | "full";
 
 interface ModalProps {
   isOpen:        boolean;
@@ -24,7 +24,8 @@ const sizeClasses: Record<ModalSize, string> = {
   md:   "max-w-md",
   lg:   "max-w-lg",
   xl:   "max-w-2xl",
-  full: "max-w-5xl",
+  half: "max-w-[75vw]",
+  full: "max-w-[95vw]",
 };
 
 export function Modal({
@@ -68,7 +69,7 @@ export function Modal({
     >
       <div
         className={cn(
-          "w-full rounded-2xl shadow-card-lg overflow-y-auto max-h-[90vh] animate-slide-up",
+          "w-full rounded-2xl shadow-card-lg max-h-[90vh] animate-slide-up flex flex-col",
           sizeClasses[size],
           className
         )}
@@ -76,10 +77,10 @@ export function Modal({
         role="dialog"
         aria-modal="true"
       >
-        {/* Header — sticks to top while body scrolls */}
+        {/* Header */}
         {title && (
           <div
-            className="sticky top-0 z-10 flex items-center gap-3 px-6 py-4 border-b"
+            className="flex-shrink-0 flex items-center gap-3 px-6 py-4 border-b"
             style={{
               borderColor: "var(--color-border)",
               background:  "var(--color-surface)",
@@ -103,14 +104,14 @@ export function Modal({
         )}
 
         {/* Body */}
-        <div className="px-6 py-5">
+        <div className="px-6 py-5 flex-1 overflow-y-auto">
           {children}
         </div>
 
-        {/* Footer — sticks to bottom while body scrolls */}
+        {/* Footer */}
         {footer && (
           <div
-            className="sticky bottom-0 z-10 flex items-center justify-end gap-3 px-6 py-4 border-t"
+            className="flex-shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t"
             style={{
               borderColor: "var(--color-border)",
               background:  "var(--color-surface)",

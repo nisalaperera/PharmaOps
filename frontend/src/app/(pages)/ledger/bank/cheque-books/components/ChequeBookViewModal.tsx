@@ -100,10 +100,10 @@ export function ChequeBookViewModal({ isOpen, onClose, book, canManage }: Cheque
               {formatDateTime(book.created_at)}
             </dd>
           </div>
-          {book.created_by_name && (
+          {book.created_by_id && (
             <div>
               <dt className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>Created By</dt>
-              <dd className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>{book.created_by_name}</dd>
+              <dd className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>{book.created_by_id}</dd>
             </div>
           )}
         </dl>

@@ -1,10 +1,10 @@
 import type { UserRole } from "@/types";
 import {
-  LayoutDashboard, Building2, Users, Package, Archive,
+  LayoutDashboard, Building, Building2, Users, Package, Archive,
   Truck, ShoppingCart, Receipt, ClipboardList, UserCircle,
   ArrowLeftRight, UserCog, Wallet, BarChart3, Bell, ScrollText,
   Layers, FlaskConical, Tag, Ruler, Contact, Vault, Landmark, ArrowRightLeft, BookOpen, CreditCard,
-  ClipboardCheck,
+  ClipboardCheck, MapPin,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -155,10 +155,24 @@ export const navigationConfig: NavItem[] = [
         requiredRole: "BRANCH_USER",
       },
       {
+        id:           "stock-movements",
+        label:        "Stock Movements",
+        href:         "/inventory/stock-movements",
+        icon:         ArrowLeftRight,
+        requiredRole: "BRANCH_MANAGER",
+      },
+      {
         id:           "stock-transfer",
         label:        "Stock Transfer",
         href:         "/inventory/stock-transfers",
         icon:         ArrowLeftRight,
+        requiredRole: "BRANCH_MANAGER",
+      },
+      {
+        id:           "stock-locations",
+        label:        "Stock Locations",
+        href:         "/inventory/stock-locations",
+        icon:         MapPin,
         requiredRole: "BRANCH_MANAGER",
       },
     ],
@@ -292,6 +306,13 @@ export const navigationConfig: NavItem[] = [
     href:         "/users",
     icon:         Users,
     requiredRole: "BRANCH_ADMIN",
+  },
+  {
+    id:           "organization",
+    label:        "Organization",
+    href:         "/organization",
+    icon:         Building,
+    requiredRole: "MANAGER",
   },
   {
     id:           "branches",

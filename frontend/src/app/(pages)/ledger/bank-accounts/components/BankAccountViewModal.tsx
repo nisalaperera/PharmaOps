@@ -130,13 +130,13 @@ export function BankAccountViewModal({ isOpen, onClose, account }: BankAccountVi
           </div>
         )}
 
-        {account.created_by_name && (
+        {account.created_by_id && (
           <div>
             <dt className="text-xs font-medium" style={{ color: "var(--color-text-muted)" }}>
               Created By
             </dt>
             <dd className="text-sm mt-0.5" style={{ color: "var(--color-text)" }}>
-              {account.created_by_name}
+              {account.created_by_id}
             </dd>
           </div>
         )}

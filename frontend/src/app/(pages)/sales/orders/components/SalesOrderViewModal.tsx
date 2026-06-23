@@ -42,7 +42,7 @@ export function SalesOrderViewModal({ isOpen, onClose, order }: SalesOrderViewMo
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Created By</dt>
-            <dd className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>{order.created_by_name}</dd>
+            <dd className="text-sm mt-1" style={{ color: "var(--color-text-muted)" }}>{order.created_by}</dd>
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Created At</dt>

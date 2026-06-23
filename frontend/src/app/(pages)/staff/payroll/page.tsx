@@ -91,7 +91,7 @@ async function exportSelectedPdf(selected: Payroll[], branchName?: string) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Non-fatal â€” continue without logo.
+    // Non-fatal — continue without logo.
   }
 
   doc.setFontSize(13);
@@ -108,7 +108,7 @@ async function exportSelectedPdf(selected: Payroll[], branchName?: string) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Payroll Report â€” " + exportDateStamp(), 14, cursorY + 4);
+  doc.text("Payroll Report — " + exportDateStamp(), 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 7 } });
@@ -124,18 +124,18 @@ export default function PayrollPage() {
   const { activeBranchId } = useBranch();
   const canManage = (permissions?.isAdmin || permissions?.isManager || permissions?.isBranchAdmin) ?? false;
 
-  // â€” Filters
+  // — Filters
   const [monthFilter,   setMonthFilter]   = useState("");
   const [yearFilter,    setYearFilter]    = useState("");
   const [paidFilter,    setPaidFilter]    = useState("");
   const [filterVisible, setFilterVisible] = useState(false);
 
-  // â€” Modals
+  // — Modals
   const [modalOpen,     setModalOpen]     = useState(false);
   const [viewPayroll,   setViewPayroll]   = useState<Payroll | null>(null);
   const [confirmPay,    setConfirmPay]    = useState<Payroll | null>(null);
 
-  // â€” Selection + export
+  // — Selection + export
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
@@ -368,7 +368,7 @@ export default function PayrollPage() {
           </Button>
 
           <SearchBar
-            placeholder="Search by staff nameâ€¦"
+            placeholder="Search by staff name..."
             onSearch={handleSearch}
             className="w-[28rem] max-w-full"
           />

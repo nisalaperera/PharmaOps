@@ -135,9 +135,9 @@ export function StaffViewModal({ isOpen, onClose, staff, branchName }: StaffView
             className="rounded-xl px-4 py-3 space-y-3"
             style={{ background: "var(--color-surface-2)" }}
           >
-            <ActivityRow label="Created by"      actor={staff.created_by_name} timestamp={staff.created_at} />
+            <ActivityRow label="Created by"      actor={staff.created_by_id} timestamp={staff.created_at} />
             <div className="h-px" style={{ background: "var(--color-border)" }} />
-            <ActivityRow label="Last updated by" actor={staff.updated_by_name} timestamp={staff.updated_at} />
+            <ActivityRow label="Last updated by" actor={staff.updated_by_id} timestamp={staff.updated_at} />
           </div>
         </div>
 

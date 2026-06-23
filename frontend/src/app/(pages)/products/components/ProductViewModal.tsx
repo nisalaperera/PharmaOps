@@ -88,7 +88,25 @@ export function ProductViewModal({ isOpen, onClose, product }: ProductViewModalP
           <Field label="Basic SKU">
             {product.basic_sku_name || <Empty />}
           </Field>
+          <Field label="Reorder Level">
+            {product.reorder_level ?? 0}
+          </Field>
+          <Field label="Discount Applicable">
+            <Badge variant={product.is_discount_applicable ? "success" : "default"}>
+              {product.is_discount_applicable ? "Yes" : "No"}
+            </Badge>
+          </Field>
         </div>
+
+        {/* Description */}
+        {product.description && (
+          <>
+            <SectionHeader title="Description" />
+            <p className="text-sm" style={{ color: "var(--color-text)" }}>
+              {product.description}
+            </p>
+          </>
+        )}
 
         {/* Specific instructions */}
         {product.specific_instructions && (
@@ -144,16 +162,16 @@ export function ProductViewModal({ isOpen, onClose, product }: ProductViewModalP
           style={{ background: "var(--color-surface-2)" }}
         >
           <Field label="Created At">
-            <span className="font-mono text-xs">{formatDateTime(product.created_at)}</span>
+            <span className="font-mono text-xs">{product.created_at ? formatDateTime(product.created_at) : "—"}</span>
           </Field>
-          <Field label="Last Modified At">
-            <span className="font-mono text-xs">{formatDateTime(product.last_modified_at)}</span>
+          <Field label="Updated At">
+            <span className="font-mono text-xs">{product.updated_at ? formatDateTime(product.updated_at) : "—"}</span>
           </Field>
           <Field label="Created By">
-            {product.created_by_name || <Empty />}
+            {product.created_by_id || <Empty />}
           </Field>
-          <Field label="Last Modified By">
-            {product.last_modified_by_name || <Empty />}
+          <Field label="Updated By">
+            {product.updated_by_id || <Empty />}
           </Field>
         </div>
 

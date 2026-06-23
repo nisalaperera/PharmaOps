@@ -13,9 +13,7 @@ class TimestampMixin(BaseModel):
 class AuditMixin(TimestampMixin):
     """Extends timestamps with who created/last-updated the record."""
     created_by_id:   Optional[str] = None
-    created_by_name: Optional[str] = None
     updated_by_id:   Optional[str] = None
-    updated_by_name: Optional[str] = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):

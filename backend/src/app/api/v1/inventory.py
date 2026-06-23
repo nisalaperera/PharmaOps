@@ -6,23 +6,27 @@ from app.core.database import get_db, Collections, doc_to_dict, new_id
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.utils.audit import audit_create_fields, audit_update_fields
 from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create, BRANCH_LEVEL_ROLES
-from app.models.inventory import InventoryResponse, InventoryUpdate, StockInPayload, StockInCreatePayload, StockOutPayload
+from app.utils.stock_log import log_stock_movement
+from app.models.inventory import (
+    InventoryResponse,
+    StockInPayload, StockInCreatePayload, BatchStockInPayload,
+    StockOutPayload, StockMovementLogResponse,
+)
 from app.models.common import PaginatedResponse, ImportResult, ImportRowError
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
-INVENTORY_SORT_FIELDS = {"product_name", "total_quantity", "min_stock_level"}
+INVENTORY_SORT_FIELDS = {"product_name", "basic_sku_total_quantity"}
+
 
 def _build_filter(
     current_user: dict,
     branch_id:    str | None,
-    low_stock:    bool | None,
     search:       str | None,
 ) -> dict:
     flt: dict = {}
     apply_branch_filter(flt, current_user, branch_id)
-    if low_stock is not None: flt["is_low_stock"] = low_stock
-    if search:                flt["product_name"] = {"$regex": re.escape(search), "$options": "i"}
+    if search: flt["product_name"] = {"$regex": re.escape(search), "$options": "i"}
     return flt
 
 
@@ -31,7 +35,6 @@ def _build_filter(
 @router.get("", response_model=PaginatedResponse[InventoryResponse])
 async def list_inventory(
     branch_id:    str | None  = Query(default=None),
-    low_stock:    bool | None = Query(default=None),
     search:       str | None  = Query(default=None),
     page:         int         = Query(default=1, ge=1),
     page_size:    int         = Query(default=20, ge=1, le=100),
@@ -40,7 +43,7 @@ async def list_inventory(
     current_user: dict = Depends(get_current_user),
 ):
     db  = get_db()
-    flt = _build_filter(current_user, branch_id, low_stock, search)
+    flt = _build_filter(current_user, branch_id, search)
 
     sort_field     = sort_by if sort_by in INVENTORY_SORT_FIELDS else "product_name"
     sort_direction = -1 if sort_dir == "desc" else 1
@@ -62,28 +65,25 @@ async def list_inventory(
 @router.get("/export")
 async def export_inventory(
     branch_id:    str | None  = Query(default=None),
-    low_stock:    bool | None = Query(default=None),
     search:       str | None  = Query(default=None),
     current_user: dict = Depends(get_current_user),
 ):
     db   = get_db()
-    flt  = _build_filter(current_user, branch_id, low_stock, search)
+    flt  = _build_filter(current_user, branch_id, search)
     docs = db[Collections.INVENTORY].find(flt).sort("product_name", 1)
 
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow([
-        "Product Name", "Branch ID", "Total Quantity",
-        "Min Stock Level", "Low Stock", "Updated At",
+        "Product Name", "Branch ID", "Basic SKU", "Basic SKU Total Qty", "Updated At",
     ])
     for doc in docs:
         d = doc_to_dict(doc)
         writer.writerow([
             d.get("product_name", ""),
             d.get("branch_id", ""),
-            d.get("total_quantity", 0),
-            d.get("min_stock_level", 0),
-            "Yes" if d.get("is_low_stock") else "No",
+            d.get("basic_sku", ""),
+            d.get("basic_sku_total_quantity", 0),
             d.get("updated_at", ""),
         ])
 
@@ -238,9 +238,8 @@ async def import_stock_in(
                 "product_id":      product_id,
                 "product_name":    resolved_name,
                 "batches":         [],
-                "total_quantity":  0,
-                "min_stock_level": 0,
-                "is_low_stock":    False,
+                "basic_sku_total_quantity": 0,
+                "basic_sku_count":         0,
                 "created_at":      now,
                 "updated_at":      now,
                 **audit_create_fields(current_user),
@@ -258,11 +257,6 @@ async def import_stock_in(
                 "batch_number":   batch_number,
                 "expiry_date":    expiry_date,
                 "quantity":       quantity,
-                "sku":            row.get("sku", ""),
-                "purchase_price": purchase_price,
-                "selling_price":  selling_price,
-                "supplier_id":    "",
-                "supplier_name":  row.get("supplier_name", ""),
                 "received_date":  datetime.now(timezone.utc).date().isoformat(),
             })
 
@@ -275,6 +269,39 @@ async def import_stock_in(
             result.updated += 1
 
     return result
+
+
+# ── Movement history (must be before /{inventory_id}) ────────────────────────
+
+@router.get("/{inventory_id}/history", response_model=PaginatedResponse[StockMovementLogResponse])
+async def get_inventory_history(
+    inventory_id:  str,
+    movement_type: str | None = Query(default=None),
+    page:          int        = Query(default=1, ge=1),
+    page_size:     int        = Query(default=20, ge=1, le=100),
+    sort_dir:      str | None = Query(default="desc"),
+    current_user:  dict = Depends(get_current_user),
+):
+    db  = get_db()
+    doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Inventory record not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
+
+    flt: dict = {"product_id": doc["product_id"], "branch_id": doc["branch_id"]}
+    if movement_type:
+        flt["movement_type"] = movement_type
+
+    sort_order = -1 if sort_dir == "desc" else 1
+    total = db[Collections.STOCK_MOVEMENT_LOGS].count_documents(flt)
+    skip  = (page - 1) * page_size
+    docs  = db[Collections.STOCK_MOVEMENT_LOGS].find(flt).sort("created_at", sort_order).skip(skip).limit(page_size)
+    items = [StockMovementLogResponse(**doc_to_dict(d)) for d in docs]
+
+    return PaginatedResponse[StockMovementLogResponse](
+        data=items, total=total, page=page,
+        page_size=page_size, total_pages=max(1, -(-total // page_size)),
+    )
 
 
 # ── Get one ───────────────────────────────────────────────────────────────────
@@ -292,37 +319,74 @@ async def get_inventory_item(
     return InventoryResponse(**doc_to_dict(doc))
 
 
-# ── Update (min_stock_level only) ─────────────────────────────────────────────
-
-@router.patch("/{inventory_id}", response_model=InventoryResponse)
-async def update_inventory(
-    inventory_id: str,
-    payload:      InventoryUpdate,
-    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
-):
-    db  = get_db()
-    doc = db[Collections.INVENTORY].find_one({"_id": inventory_id})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Inventory record not found")
-    ensure_branch_access(doc_to_dict(doc), current_user)
-
-    updates = {k: v for k, v in payload.model_dump(exclude_none=True).items()}
-    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
-    updates.update(audit_update_fields(current_user))
-    db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
-    updated = db[Collections.INVENTORY].find_one({"_id": inventory_id})
-    return InventoryResponse(**doc_to_dict(updated))
-
-
 def _recalculate_inventory(doc: dict, batches: list, current_user: dict | None = None) -> dict:
-    """Recalculate total_quantity and is_low_stock from updated batches."""
-    total_qty   = sum(b["quantity"] for b in batches)
-    is_low_stock = total_qty <= doc.get("min_stock_level", 0)
-    now         = datetime.now(timezone.utc).isoformat()
-    result = {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low_stock, "updated_at": now}
+    """Recalculate basic_sku_total_quantity from batches."""
+    basic_sku_total = sum(b.get("basic_sku_quantity", 0) for b in batches)
+    now = datetime.now(timezone.utc).isoformat()
+    result = {"batches": batches, "basic_sku_total_quantity": basic_sku_total, "updated_at": now}
     if current_user:
         result.update(audit_update_fields(current_user))
     return result
+
+
+# ── Batch Stock In ────────────────────────────────────────────────────────────
+
+@router.post("/stock-in/batch", status_code=201)
+async def batch_stock_in(
+    payload:      BatchStockInPayload,
+    current_user: dict = Depends(require_min_role("BRANCH_MANAGER")),
+):
+    db        = get_db()
+    branch_id = enforce_branch_on_create(payload.branch_id, current_user)
+    results   = []
+
+    for item in payload.items:
+        doc = db[Collections.INVENTORY].find_one({"product_id": item.product_id, "branch_id": branch_id})
+        if not doc:
+            now     = datetime.now(timezone.utc).isoformat()
+            product = db[Collections.PRODUCTS].find_one({"_id": item.product_id}, {"name": 1})
+            doc     = {
+                "_id":            new_id(),
+                "branch_id":      branch_id,
+                "product_id":     item.product_id,
+                "product_name":   product["name"] if product else "",
+                "batches":        [],
+                "basic_sku_total_quantity": 0,
+                "basic_sku_count":         0,
+                "created_at":     now,
+                "updated_at":     now,
+                **audit_create_fields(current_user),
+            }
+            db[Collections.INVENTORY].insert_one(doc)
+
+        inventory_id = doc["_id"]
+        batches      = list(doc.get("batches", []))
+        existing     = next((b for b in batches if b["batch_number"] == item.batch_number), None)
+        if existing:
+            existing["quantity"] += item.quantity
+        else:
+            batches.append({
+                "batch_number":      item.batch_number,
+                "expiry_date":       item.expiry_date,
+                "quantity":          item.quantity,
+                "received_quantity": item.quantity,
+                "received_date":     datetime.now(timezone.utc).date().isoformat(),
+                "stock_location_id": item.stock_location_id,
+            })
+
+        updates = _recalculate_inventory(doc, batches, current_user)
+        db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
+
+        log_stock_movement(
+            db, current_user, branch_id=branch_id, product_id=item.product_id,
+            product_name=doc.get("product_name", ""), batch_number=item.batch_number,
+            quantity=item.quantity, movement_type="STOCK_IN",
+            notes=item.notes, reference_type="manual",
+        )
+
+        results.append(inventory_id)
+
+    return {"processed": len(results), "inventory_ids": list(set(results))}
 
 
 # ── Stock In (create or update inventory record) ──────────────────────────────
@@ -345,12 +409,11 @@ async def stock_in_create(
             "branch_id":      branch_id,
             "product_id":     payload.product_id,
             "product_name":   product["name"] if product else "",
-            "batches":        [],
-            "total_quantity":  0,
-            "min_stock_level": 0,
-            "is_low_stock":    False,
-            "created_at":     now,
-            "updated_at":     now,
+            "batches":                 [],
+            "basic_sku_total_quantity": 0,
+            "basic_sku_count":         0,
+            "created_at":              now,
+            "updated_at":              now,
             **audit_create_fields(current_user),
         }
         db[Collections.INVENTORY].insert_one(doc)
@@ -362,19 +425,30 @@ async def stock_in_create(
         existing["quantity"] += payload.quantity
     else:
         batches.append({
-            "batch_number":   payload.batch_number,
-            "expiry_date":    payload.expiry_date,
-            "quantity":       payload.quantity,
-            "sku":            payload.sku or "",
-            "purchase_price": payload.purchase_price,
-            "selling_price":  payload.selling_price,
-            "supplier_id":    payload.supplier_id or "",
-            "supplier_name":  payload.supplier_name or "",
-            "received_date":  datetime.now(timezone.utc).date().isoformat(),
+            "batch_number":        payload.batch_number,
+            "expiry_date":         payload.expiry_date,
+            "quantity":            payload.quantity,
+            "received_quantity":   payload.quantity,
+            "received_date":       datetime.now(timezone.utc).date().isoformat(),
+            "manufacture_date":    payload.manufacture_date,
+            "stock_location_id":   payload.stock_location_id,
+            "channel_id":          payload.channel_id,
+            "purchase_invoice_id": payload.purchase_invoice_id,
         })
 
     updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
+
+    log_stock_movement(
+        db, current_user, branch_id=branch_id, product_id=payload.product_id,
+        product_name=doc.get("product_name", ""), batch_number=payload.batch_number,
+        quantity=payload.quantity, movement_type="STOCK_IN",
+        notes=payload.notes, reference_type="manual",
+        expiry_date=payload.expiry_date,
+        sku=payload.sku, purchase_price=payload.purchase_price, selling_price=payload.selling_price,
+        stock_location_id=payload.stock_location_id,
+    )
+
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))
 
 
@@ -399,19 +473,30 @@ async def stock_in(
         existing["quantity"] += payload.quantity
     else:
         batches.append({
-            "batch_number":   payload.batch_number,
-            "expiry_date":    payload.expiry_date,
-            "quantity":       payload.quantity,
-            "sku":            payload.sku or "",
-            "purchase_price": payload.purchase_price,
-            "selling_price":  payload.selling_price,
-            "supplier_id":    payload.supplier_id or "",
-            "supplier_name":  payload.supplier_name or "",
-            "received_date":  datetime.now(timezone.utc).date().isoformat(),
+            "batch_number":        payload.batch_number,
+            "expiry_date":         payload.expiry_date,
+            "quantity":            payload.quantity,
+            "received_quantity":   payload.quantity,
+            "received_date":       datetime.now(timezone.utc).date().isoformat(),
+            "manufacture_date":    payload.manufacture_date,
+            "stock_location_id":   payload.stock_location_id,
+            "channel_id":          payload.channel_id,
+            "purchase_invoice_id": payload.purchase_invoice_id,
         })
 
     updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
+
+    log_stock_movement(
+        db, current_user, branch_id=doc.get("branch_id", ""),
+        product_id=doc.get("product_id", ""), product_name=doc.get("product_name", ""),
+        batch_number=payload.batch_number, quantity=payload.quantity,
+        movement_type="STOCK_IN", notes=payload.notes, reference_type="manual",
+        expiry_date=payload.expiry_date,
+        sku=payload.sku, purchase_price=payload.purchase_price, selling_price=payload.selling_price,
+        stock_location_id=payload.stock_location_id,
+    )
+
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))
 
 
@@ -444,4 +529,45 @@ async def stock_out(
 
     updates = _recalculate_inventory(doc, batches, current_user)
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
+
+    log_stock_movement(
+        db, current_user, branch_id=doc.get("branch_id", ""),
+        product_id=doc.get("product_id", ""), product_name=doc.get("product_name", ""),
+        batch_number=payload.batch_number, quantity=payload.quantity,
+        movement_type="STOCK_OUT", reason=payload.reason,
+        notes=payload.notes, reference_type="manual",
+    )
+
     return InventoryResponse(**doc_to_dict(db[Collections.INVENTORY].find_one({"_id": inventory_id})))
+
+
+# ── Stock Movements ──────────────────────────────────────────────────────────
+
+@router.get("/movements", response_model=PaginatedResponse[StockMovementLogResponse])
+async def list_movements(
+    branch_id:     str | None = Query(default=None),
+    product_id:    str | None = Query(default=None),
+    movement_type: str | None = Query(default=None),
+    page:          int = Query(default=1, ge=1),
+    page_size:     int = Query(default=20, ge=1, le=100),
+    sort_dir:      str | None = Query(default="desc"),
+    current_user:  dict = Depends(get_current_user),
+):
+    db  = get_db()
+    flt: dict = {}
+    apply_branch_filter(flt, current_user, branch_id)
+    if product_id:
+        flt["product_id"] = product_id
+    if movement_type:
+        flt["movement_type"] = movement_type
+
+    sort_order = 1 if sort_dir == "asc" else -1
+    total = db[Collections.STOCK_MOVEMENT_LOGS].count_documents(flt)
+    skip  = (page - 1) * page_size
+    docs  = db[Collections.STOCK_MOVEMENT_LOGS].find(flt).sort("created_at", sort_order).skip(skip).limit(page_size)
+    items = [StockMovementLogResponse(**doc_to_dict(d)) for d in docs]
+
+    return PaginatedResponse[StockMovementLogResponse](
+        data=items, total=total, page=page,
+        page_size=page_size, total_pages=max(1, -(-total // page_size)),
+    )

@@ -112,8 +112,8 @@ export function CustomerViewModal({ customer, isOpen, onClose, onEdit }: Custome
 
         {/* Audit */}
         <div className="border-t pt-3 grid grid-cols-2 gap-3 text-xs" style={{ borderColor: "var(--color-border)", color: "var(--color-text-muted)" }}>
-          <div><span className="font-medium">Created: </span>{formatDateTime(customer.created_at)}{customer.created_by_name && ` by ${customer.created_by_name}`}</div>
-          <div><span className="font-medium">Updated: </span>{formatDateTime(customer.updated_at)}{customer.updated_by_name && ` by ${customer.updated_by_name}`}</div>
+          <div><span className="font-medium">Created: </span>{formatDateTime(customer.created_at)}{customer.created_by_id && ` by ${customer.created_by_id}`}</div>
+          <div><span className="font-medium">Updated: </span>{formatDateTime(customer.updated_at)}{customer.updated_by_id && ` by ${customer.updated_by_id}`}</div>
         </div>
 
         <div className="flex justify-end gap-2">

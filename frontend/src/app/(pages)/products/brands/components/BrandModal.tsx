@@ -9,6 +9,7 @@ import { Button }    from "@/components/ui/Button";
 import { Input }     from "@/components/ui/Input";
 import { apiPost, apiPatch } from "@/lib/api-client";
 import { showToast } from "@/lib/toast";
+import { PHARMA_COUNTRY_OPTIONS } from "@/lib/constants";
 import { brandSchema, type BrandFormValues } from "../schemas";
 import type { ProductBrand } from "@/types";
 
@@ -24,15 +25,20 @@ export function BrandModal({ isOpen, onClose, editingBrand }: BrandModalProps) {
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<BrandFormValues>({
     resolver:      zodResolver(brandSchema),
-    defaultValues: { name: "", manufacturer_name: "" },
+    defaultValues: { name: "", manufacturer_name: "", country: "", return_expiry_before: undefined },
   });
 
   useEffect(() => {
     if (isOpen) {
       reset(
         isEditing
-          ? { name: editingBrand.name, manufacturer_name: editingBrand.manufacturer_name ?? "" }
-          : { name: "", manufacturer_name: "" }
+          ? {
+              name:                 editingBrand.name,
+              manufacturer_name:    editingBrand.manufacturer_name ?? "",
+              country:              editingBrand.country ?? "",
+              return_expiry_before: editingBrand.return_expiry_before ?? undefined,
+            }
+          : { name: "", manufacturer_name: "", country: "", return_expiry_before: undefined }
       );
     }
   }, [isOpen, isEditing, editingBrand, reset]);
@@ -93,6 +99,25 @@ export function BrandModal({ isOpen, onClose, editingBrand }: BrandModalProps) {
           error={errors.manufacturer_name?.message}
           {...register("manufacturer_name")}
         />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="form-label">Country</label>
+            <select {...register("country")} className="form-select w-full">
+              <option value="">Select country...</option>
+              {PHARMA_COUNTRY_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <Input
+            label="Return Expiry Before (days)"
+            type="number"
+            placeholder="e.g. 60"
+            helperText="Days before expiry for return policy"
+            {...register("return_expiry_before")}
+            error={errors.return_expiry_before?.message}
+          />
+        </div>
       </div>
     </Modal>
   );

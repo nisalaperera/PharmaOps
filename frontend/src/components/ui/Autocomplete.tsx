@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Plus, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +30,7 @@ export function Autocomplete({
   value,
   onChange,
   onCreateNew,
-  placeholder = "Search or select…",
+  placeholder = "Search or select...",
   error,
   required,
   isLoading,
@@ -39,11 +40,23 @@ export function Autocomplete({
   const [inputValue, setInputValue] = useState("");
   const [isOpen,     setIsOpen]     = useState(false);
   const containerRef                = useRef<HTMLDivElement>(null);
+  const inputRef                    = useRef<HTMLInputElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     const found = options.find((o) => o.value === value);
     setInputValue(found?.label ?? "");
   }, [value, options]);
+
+  const updateDropdownPosition = useCallback(() => {
+    if (!inputRef.current) return;
+    const rect = inputRef.current.getBoundingClientRect();
+    setDropdownPos({
+      top:   rect.bottom + window.scrollY + 4,
+      left:  rect.left + window.scrollX,
+      width: rect.width,
+    });
+  }, []);
 
   useEffect(() => {
     function handleOutside(e: MouseEvent) {
@@ -53,9 +66,18 @@ export function Autocomplete({
         setInputValue(found?.label ?? "");
       }
     }
-    if (isOpen) document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, [isOpen, value, options]);
+    if (isOpen) {
+      document.addEventListener("mousedown", handleOutside);
+      updateDropdownPosition();
+      window.addEventListener("scroll", updateDropdownPosition, true);
+      window.addEventListener("resize", updateDropdownPosition);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("scroll", updateDropdownPosition, true);
+      window.removeEventListener("resize", updateDropdownPosition);
+    };
+  }, [isOpen, value, options, updateDropdownPosition]);
 
   const filtered = inputValue
     ? options.filter((o) => o.label.toLowerCase().includes(inputValue.toLowerCase()))
@@ -80,6 +102,58 @@ export function Autocomplete({
     setIsOpen(false);
   }
 
+  const dropdownContent = isOpen && dropdownPos && createPortal(
+    <div
+      className="fixed z-[9999] rounded-xl border shadow-lg overflow-hidden"
+      style={{
+        background:  "var(--color-surface)",
+        borderColor: "var(--color-border)",
+        top:         dropdownPos.top,
+        left:        dropdownPos.left,
+        width:       dropdownPos.width,
+      }}
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <ul className="max-h-52 overflow-y-auto py-1">
+        {filtered.length > 0 ? (
+          filtered.map((opt) => (
+            <li key={opt.value}>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); handleSelect(opt); }}
+                className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-[var(--color-surface-2)] transition-colors"
+                style={{ color: "var(--color-text)" }}
+              >
+                <span className="truncate">{opt.label}</span>
+                {opt.value === value && (
+                  <Check className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+                )}
+              </button>
+            </li>
+          ))
+        ) : (
+          <li className="px-3 py-2 text-sm" style={{ color: "var(--color-text-muted)" }}>
+            No results
+          </li>
+        )}
+      </ul>
+
+      {showCreate && (
+        <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); handleCreateNew(); }}
+            className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-[var(--color-surface-2)] transition-colors text-primary-500"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create &quot;{inputValue.trim()}&quot;
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       {label && (
@@ -91,11 +165,12 @@ export function Autocomplete({
 
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => { if (!disabled) setIsOpen(true); }}
-          placeholder={isLoading ? "Loading…" : placeholder}
+          onFocus={() => { if (!disabled) { setIsOpen(true); updateDropdownPosition(); } }}
+          placeholder={isLoading ? "Loading..." : placeholder}
           disabled={isLoading || disabled}
           className={cn(
             "form-input pr-8",
@@ -111,49 +186,7 @@ export function Autocomplete({
         />
       </div>
 
-      {isOpen && (
-        <div
-          className="absolute z-50 mt-1 w-full rounded-xl border shadow-lg overflow-hidden"
-          style={{ background: "var(--color-surface)", borderColor: "var(--color-border)" }}
-        >
-          <ul className="max-h-52 overflow-y-auto py-1">
-            {filtered.length > 0 ? (
-              filtered.map((opt) => (
-                <li key={opt.value}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => { e.preventDefault(); handleSelect(opt); }}
-                    className="w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-[var(--color-surface-2)] transition-colors"
-                    style={{ color: "var(--color-text)" }}
-                  >
-                    <span className="truncate">{opt.label}</span>
-                    {opt.value === value && (
-                      <Check className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
-                    )}
-                  </button>
-                </li>
-              ))
-            ) : (
-              <li className="px-3 py-2 text-sm" style={{ color: "var(--color-text-muted)" }}>
-                No results
-              </li>
-            )}
-          </ul>
-
-          {showCreate && (
-            <div className="border-t" style={{ borderColor: "var(--color-border)" }}>
-              <button
-                type="button"
-                onMouseDown={(e) => { e.preventDefault(); handleCreateNew(); }}
-                className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-[var(--color-surface-2)] transition-colors text-primary-500"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Create &quot;{inputValue.trim()}&quot;
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      {dropdownContent}
 
       {error && <p className="form-error">{error}</p>}
     </div>

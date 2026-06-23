@@ -143,7 +143,7 @@ async def create_purchase_order(
     payload.branch_id = enforce_branch_on_create(payload.branch_id, current_user)
 
     supplier_doc     = db[Collections.SUPPLIERS].find_one({"_id": payload.supplier_id, "supplier_type": "DISTRIBUTOR"})
-    supplier_name    = supplier_doc.get("short_name", "") if supplier_doc else ""
+    supplier_name    = supplier_doc.get("name", supplier_doc.get("short_name", "")) if supplier_doc else ""
     channel_name     = ""
     credit_term_days = 30
     if supplier_doc:

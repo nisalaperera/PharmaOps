@@ -128,8 +128,8 @@ export function SupplierViewModal({ isOpen, onClose, supplier }: SupplierViewMod
         {/* ── Summary ─────────────────────────────────────────────────────── */}
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Short Name</dt>
-            <dd className="text-sm font-semibold mt-1" style={{ color: "var(--color-text)" }}>{supplier.short_name}</dd>
+            <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--color-text-muted)" }}>Name</dt>
+            <dd className="text-sm font-semibold mt-1" style={{ color: "var(--color-text)" }}>{supplier.name}</dd>
           </div>
 
           <div>

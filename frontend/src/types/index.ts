@@ -31,7 +31,12 @@ export type SaleStatus = "COMPLETED" | "REFUNDED" | "PARTIAL_REFUND";
 
 export type ChequeStatus = "PENDING" | "CLEARED" | "BOUNCED";
 
-export type TransferStatus = "PENDING" | "CONFIRMED" | "REJECTED" | "CANCELLED";
+export type TransferStatus = "PENDING" | "IN_TRANSIT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "REJECTED" | "CANCELLED";
+
+export type StockMovementLogType = "STOCK_IN" | "STOCK_OUT" | "TRANSFER_IN" | "TRANSFER_OUT" | "PURCHASE" | "SALE";
+
+export type StockMovementType   = "STOCK_IN" | "STOCK_OUT";
+export type StockMovementStatus = "CREATED" | "PARTIALLY_COMPLETED" | "COMPLETED";
 
 export type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "HALF_DAY";
 
@@ -69,14 +74,76 @@ export interface User {
   updated_at: string;
   last_login_at?: string;
   created_by_id?:   string;
-  created_by_name?: string;
   updated_by_id?:   string;
-  updated_by_name?: string;
 }
 
 export interface UserPreferences {
   user_id: string;
   theme: ThemeOption;
+}
+
+// ─── Chain & Shared Types ─────────────────────────────────────────────────────
+
+export type CurrencyCode = "LKR" | "USD" | "EUR" | "GBP" | "INR";
+
+export type EntityContactTitle = "Mr." | "Mrs." | "Ms." | "Dr." | "Prof.";
+
+export interface EntityContact {
+  id?:        string;
+  identifier: string;
+  title:      EntityContactTitle;
+  first_name: string;
+  last_name:  string;
+  mobile_1:   string;
+  mobile_2?:  string;
+  whatsapp?:  string;
+  landline?:  string;
+  email?:     string;
+  is_active:  boolean;
+}
+
+export interface PayeTaxSlab {
+  min_amount:   number;
+  max_amount:   number | null;
+  rate_percent: number;
+  fixed_amount: number;
+}
+
+export interface ChainSettings {
+  default_currency:       CurrencyCode;
+  low_stock_threshold:    number;
+  expiry_alert_days:      number;
+  loyalty_points_rate?:   number | null;
+  tax_enabled:            boolean;
+  is_discount_applicable: boolean;
+  invoice_footer_text?:   string | null;
+  storage_conditions:     string[];
+  special_instructions:   string[];
+  dosage_instructions:    string[];
+}
+
+export interface ChainHRParams {
+  standard_daily_hours:   number;
+  working_days_per_month: number;
+  ot_rate_multiplier:     number;
+  epf_employee_rate:      number;
+  epf_employer_rate:      number;
+  etf_employer_rate:      number;
+  paye_tax_slabs:         PayeTaxSlab[];
+}
+
+export interface Chain {
+  id:           string;
+  name:         string;
+  logo?:        string | null;
+  chain_prefix: string;
+  contacts:     EntityContact[];
+  settings:     ChainSettings;
+  hr_params:    ChainHRParams;
+  created_at?:  string;
+  updated_at?:  string;
+  created_by_id?:   string;
+  updated_by_id?:   string;
 }
 
 // ─── Branch ───────────────────────────────────────────────────────────────────
@@ -88,49 +155,130 @@ export interface BranchOperatingHours {
   is_closed: boolean;
 }
 
+export interface BranchSettings {
+  currency?:              CurrencyCode | null;
+  logo?:                  string | null;
+  low_stock_threshold?:   number | null;
+  expiry_alert_days?:     number | null;
+  loyalty_points_rate?:   number | null;
+  tax_enabled?:           boolean | null;
+  is_discount_applicable?: boolean | null;
+  invoice_footer_text?:   string | null;
+  storage_conditions?:    string[] | null;
+  special_instructions?:  string[] | null;
+  dosage_instructions?:   string[] | null;
+}
+
+export interface BranchHRParams {
+  standard_daily_hours?:   number | null;
+  working_days_per_month?: number | null;
+  ot_rate_multiplier?:     number | null;
+  epf_employee_rate?:      number | null;
+  epf_employer_rate?:      number | null;
+  etf_employer_rate?:      number | null;
+  paye_tax_slabs?:         PayeTaxSlab[] | null;
+}
+
 export interface Branch {
   id: string;
   name: string;
-  code: string;
   address: string;
-  phone: string;
   license_number: string;
-  assigned_pharmacist_id: string | null;
+  branch_prefix?: string | null;
+  chain_id?: string | null;
+  branch_manager?: string | null;
   assigned_staff_ids: string[];
+  contacts: EntityContact[];
   operating_hours: BranchOperatingHours[];
+  settings?: BranchSettings | null;
+  hr_params?: BranchHRParams | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  phone?: string;
+  assigned_pharmacist_id?: string | null;
   created_by_id?:   string;
-  created_by_name?: string;
   updated_by_id?:   string;
-  updated_by_name?: string;
+}
+
+// ─── Stock Locations ──────────────────────────────────────────────────────────
+
+export interface StockLocation {
+  id:           string;
+  branch_id:    string;
+  name:         string;
+  code:         string;
+  description?: string | null;
+  is_active:    boolean;
+  created_at?:  string;
+  updated_at?:  string;
+  created_by_id?:   string;
+  updated_by_id?:   string;
 }
 
 // ─── Product Catalog ──────────────────────────────────────────────────────────
 
 export interface ProductCategory {
-  id:           string;
-  name:         string;
-  description?: string;
-  parent_id?:   string | null;
-  parent_name?: string | null;
-  is_active:    boolean;
+  id:                            string;
+  name:                          string;
+  parent_id?:                    string | null;
+  parent_name?:                  string | null;
+  is_discount_applicable:        boolean;
+  default_margin_percentage?:    number | null;
+  effective_margin_percentage?:  number | null;
+  icon?:                         string | null;
+  colour?:                       string | null;
+  level?:                        number;
+  path?:                         string;
+  is_active:                     boolean;
+  created_at?:                   string;
+  updated_at?:                   string;
+  created_by_id?:                string;
+  updated_by_id?:                string;
 }
 
+export type DosageForm =
+  | "TABLET" | "CAPSULE" | "SYRUP" | "INJECTION" | "CREAM" | "OINTMENT"
+  | "DROPS" | "INHALER" | "SUPPOSITORY" | "PATCH" | "POWDER" | "SOLUTION"
+  | "SUSPENSION" | "GEL" | "SPRAY" | "LOZENGE" | "OTHER";
+
+export type ControlledSchedule =
+  | "NONE" | "SCHEDULE_I" | "SCHEDULE_II" | "SCHEDULE_III" | "SCHEDULE_IV" | "SCHEDULE_V";
+
 export interface ProductGeneric {
-  id:           string;
-  name:         string;
-  description?: string;
-  is_active:    boolean;
+  id:                             string;
+  name:                           string;
+  description?:                   string | null;
+  dosage_form?:                   DosageForm | null;
+  requires_prescription:          boolean;
+  controlled_substance_schedule?: ControlledSchedule | null;
+  active_ingredients:             string[];
+  side_effects:                   string[];
+  drug_interactions:              string[];
+  local_license_number?:          string | null;
+  storage_conditions:             string[];
+  special_instructions:           string[];
+  dosage_instructions:            string[];
+  stock_location_id?:             string | null;
+  stock_location_name?:           string | null;
+  is_active:                      boolean;
+  created_at?:                    string;
+  updated_at?:                    string;
+  created_by_id?:                 string;
+  updated_by_id?:                 string;
 }
 
 export interface ProductBrand {
-  id:                string;
-  name:              string;
-  manufacturer_name?: string;
-  description?:      string | null;
-  is_active:         boolean;
+  id:                    string;
+  name:                  string;
+  manufacturer_name?:    string;
+  country?:              string | null;
+  return_expiry_before?: number | null;
+  is_active:             boolean;
+  created_at?:           string;
+  updated_at?:           string;
+  created_by_id?:        string;
+  updated_by_id?:        string;
 }
 
 export type SkuType = "COUNT" | "VOLUME" | "WEIGHT" | "LENGTH";
@@ -141,6 +289,10 @@ export interface ProductSku {
   plural?:   string | null;
   sku_type:  SkuType;
   is_active: boolean;
+  created_at?:      string;
+  updated_at?:      string;
+  created_by_id?:   string;
+  updated_by_id?:   string;
 }
 
 export interface SkuMapping {
@@ -151,53 +303,88 @@ export interface SkuMapping {
 }
 
 export interface Product {
-  id:                     string;
-  name:                   string;
-  generic_id:             string;
-  generic_name:           string;
-  brand_id:               string;
-  brand_name:             string;
-  category_id:            string;
-  category_name:          string;
-  basic_sku_id:           string;
-  basic_sku_name:         string;
-  barcode?:               string;
-  specific_instructions?: string | null;
-  sku_mappings:           SkuMapping[];
-  is_active:                boolean;
-  created_at:               string;
-  last_modified_at:         string;
-  created_by_id?:           string;
-  created_by_name?:         string;
-  last_modified_by_id?:     string;
-  last_modified_by_name?:   string;
+  id:                      string;
+  name:                    string;
+  generic_id?:             string | null;
+  generic_name:            string;
+  brand_id?:               string | null;
+  brand_name:              string;
+  category_id:             string;
+  category_name:           string;
+  basic_sku_id:            string;
+  basic_sku_name:          string;
+  barcode?:                string;
+  description?:            string | null;
+  image?:                  string | null;
+  specific_instructions?:  string | null;
+  is_discount_applicable:  boolean;
+  reorder_level:           number;
+  sku_mappings:            SkuMapping[];
+  is_active:               boolean;
+  created_at?:             string;
+  updated_at?:             string;
+  created_by_id?:          string;
+  updated_by_id?:          string;
 }
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
 export interface InventoryBatch {
-  batch_number:   string;
-  expiry_date:    string;
-  quantity:       number;
-  sku:            string;
-  purchase_price: number;
-  selling_price:  number;
-  supplier_id:    string;
-  supplier_name:  string;
-  received_date:  string;
+  batch_number:             string;
+  expiry_date:              string;
+  quantity:                 number;
+  received_quantity?:       number;
+  basic_sku?:               string | null;
+  basic_sku_quantity:       number;
+  basic_sku_selling_price:  number;
+  basic_sku_purchase_price: number;
+  manufacture_date?:        string | null;
+  channel_id?:              string | null;
+  purchase_invoice_id?:     string | null;
+}
+
+export interface StockMovementLog {
+  id:                       string;
+  branch_id:                string;
+  product_id:               string;
+  product_name:             string;
+  batch_number:             string;
+  expiry_date?:             string | null;
+  sku?:                     string | null;
+  quantity:                 number;
+  purchase_price?:          number | null;
+  selling_price?:           number | null;
+  basic_sku?:               string | null;
+  basic_sku_count?:         number | null;
+  basic_sku_quantity?:      number | null;
+  basic_sku_selling_price?: number | null;
+  basic_sku_purchase_price?: number | null;
+  stock_location_id?:       string | null;
+  movement_type:            StockMovementLogType;
+  reason?:                  string | null;
+  notes?:                   string | null;
+  reference_id?:            string | null;
+  reference_type?:          string | null;
+  created_at?:              string;
+}
+
+export interface LocationSuggestion {
+  stock_location_id:   string;
+  stock_location_name: string;
+  is_new:              boolean;
 }
 
 export interface InventoryItem {
-  id:              string;
-  branch_id:       string;
-  product_id:      string;
-  product_name:    string;
-  batches:         InventoryBatch[];
-  total_quantity:  number;
-  min_stock_level: number;
-  is_low_stock:    boolean;
-  created_at?:     string;
-  updated_at?:     string;
+  id:                       string;
+  branch_id:                string;
+  product_id:               string;
+  product_name:             string;
+  basic_sku?:               string | null;
+  basic_sku_count:          number;
+  batches:                  InventoryBatch[];
+  basic_sku_total_quantity: number;
+  created_at?:              string;
+  updated_at?:              string;
 }
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────
@@ -207,6 +394,20 @@ export type ChannelCategory   = "AGENCY" | "SUB";
 export type ContactType       = "SALES" | "DELIVERY";
 export type ContactTitle      = "Mr." | "Mrs." | "Ms." | "Dr." | "Prof.";
 export type DeliveryFrequency = "DAILY" | "WEEKLY" | "BI_WEEKLY" | "MONTHLY" | "AS_NEEDED";
+export type PromotionType    = "PERCENTAGE" | "BONUS_QUANTITY";
+
+export interface ChannelPromotion {
+  id?:               string;
+  name:              string;
+  promotion_type:    PromotionType;
+  discount_percent?: number | null;
+  buy_quantity?:     number | null;
+  free_quantity?:    number | null;
+  is_default:        boolean;
+  valid_from?:       string | null;
+  valid_to?:         string | null;
+  is_active:         boolean;
+}
 
 export interface ChannelContact {
   id?:          string;
@@ -220,14 +421,23 @@ export interface ChannelContact {
 }
 
 export interface ChannelProductMapping {
-  product_id:   string;
-  product_name: string;
+  product_id:            string;
+  product_name:          string;
+  sort_order:            number;
+  cost_price?:           number | null;
+  pack_sku_id?:          string | null;
+  pack_sku_name?:        string | null;
+  default_promotion_ids: string[];
 }
 
 export interface AgencyChannel {
   id?:              string;
   channel_name:     string;
   contacts:         ChannelContact[];
+  entity_contacts:  EntityContact[];
+  credit_term_days: number;
+  credit_limit?:    number | null;
+  promotions:       ChannelPromotion[];
   product_mappings: ChannelProductMapping[];
 }
 
@@ -238,8 +448,11 @@ export interface DistributorChannel {
   agency_id?:         string;
   agency_name?:       string;
   credit_term_days:   number;
+  credit_limit?:      number | null;
   delivery_frequency: DeliveryFrequency;
   contacts:           ChannelContact[];
+  entity_contacts:    EntityContact[];
+  promotions:         ChannelPromotion[];
   product_mappings:   ChannelProductMapping[];
 }
 
@@ -250,22 +463,86 @@ export interface ExpiryAlertConfig {
 }
 
 export interface Supplier {
-  id:                   string;
-  supplier_type:        SupplierType;
-  short_name:           string;
-  legal_name:           string;
-  registration_number?: string;
-  agency_channels:      AgencyChannel[];
-  distributor_channels: DistributorChannel[];
-  expiry_alert_configs: ExpiryAlertConfig[];
-  is_active:            boolean;
-  created_at?:          string;
-  updated_at?:          string;
+  id:                    string;
+  supplier_type:         SupplierType;
+  name:                  string;
+  legal_name:            string;
+  registration_number?:  string;
+  contacts:              EntityContact[];
+  credit_term_days:      number;
+  credit_limit?:         number | null;
+  outstanding_balance:   number;
+  notes?:                string | null;
+  agency_channels:       AgencyChannel[];
+  distributor_channels:  DistributorChannel[];
+  expiry_alert_configs:  ExpiryAlertConfig[];
+  is_active:             boolean;
+  short_name?:           string;
+  created_at?:           string;
+  updated_at?:           string;
+  created_by_id?:        string;
+  updated_by_id?:        string;
 }
 
 export interface SupplierAgencyOption {
-  id:         string;
-  short_name: string;
+  id:   string;
+  name: string;
+}
+
+// ─── Purchase Credit Notes ────────────────────────────────────────────────────
+
+export type CreditNoteStatus = "DRAFT" | "APPROVED" | "APPLIED" | "CANCELLED";
+
+export interface CreditNoteItem {
+  product_id:             string;
+  product_name:           string;
+  batch_number:           string;
+  expiry_date:            string;
+  quantity:               number;
+  unit_price:             number;
+  line_total:             number;
+  source_invoice_id?:     string | null;
+  return_policy_warning?: string | null;
+}
+
+export interface PurchaseCreditNote {
+  id:                   string;
+  credit_note_number:   string;
+  branch_id:            string;
+  supplier_id:          string;
+  supplier_name:        string;
+  channel_id?:          string | null;
+  channel_name:         string;
+  credit_note_date:     string;
+  items:                CreditNoteItem[];
+  total_amount:         number;
+  status:               CreditNoteStatus;
+  applied_payment_id?:  string | null;
+  applied_at?:          string | null;
+  inventory_deducted:   boolean;
+  notes?:               string | null;
+  created_at?:          string;
+  updated_at?:          string;
+  created_by_id?:       string;
+}
+
+// ─── Rep Visits ──────────────────────────────────────────────────────────────
+
+export interface RepVisit {
+  id:                 string;
+  supplier_id:        string;
+  supplier_name:      string;
+  channel_id:         string;
+  channel_name:       string;
+  visit_date:         string;
+  rep_name:           string;
+  rep_contact?:       string | null;
+  notes?:             string | null;
+  purchase_order_id?: string | null;
+  created_at?:        string;
+  updated_at?:        string;
+  created_by_id?:     string;
+  updated_by_id?:     string;
 }
 
 // ─── Purchase Order ───────────────────────────────────────────────────────────
@@ -427,7 +704,6 @@ export interface SalesOrder {
   total_amount:    number;
   status:          SalesOrderStatus;
   created_by:      string;
-  created_by_name: string;
   confirmed_at?:   string;
   invoiced_at?:    string;
   cancelled_at?:   string;
@@ -466,9 +742,7 @@ export interface Customer {
   created_at:          string;
   updated_at:          string;
   created_by_id?:      string;
-  created_by_name?:    string;
   updated_by_id?:      string;
-  updated_by_name?:    string;
 }
 
 // ─── Patient (prescription profile linked to a Customer) ─────────────────────
@@ -597,17 +871,56 @@ export interface CustomerLedger {
   entries:             CustomerLedgerEntry[];
 }
 
+// ─── Stock Orders ────────────────────────────────────────────────────────────
+
+export interface StockMovementItem {
+  product_id:               string;
+  product_name:             string;
+  sku:                      string;
+  batch_number:             string;
+  expiry_date:              string;
+  quantity:                 number;
+  confirmed_quantity:       number;
+  purchase_price:           number;
+  selling_price:            number;
+  basic_sku?:               string | null;
+  basic_sku_count:          number;
+  basic_sku_quantity:       number;
+  basic_sku_selling_price:  number;
+  basic_sku_purchase_price: number;
+  stock_location_id?:       string | null;
+  stock_location_name?:     string | null;
+  is_confirmed:             boolean;
+  reason?:                  string | null;
+}
+
+export interface StockMovement {
+  id:              string;
+  movement_number: string;
+  type:            StockMovementType;
+  branch_id:       string;
+  status:          StockMovementStatus;
+  items:           StockMovementItem[];
+  notes?:          string | null;
+  created_at?:     string;
+  updated_at?:     string;
+  created_by_id?:  string;
+  updated_by_id?:  string;
+}
+
 // ─── Stock Transfer ───────────────────────────────────────────────────────────
 
 export interface StockTransferItem {
-  product_id:   string;
-  product_name: string;
-  batch_number: string;
-  quantity:     number;
+  product_id:        string;
+  product_name:      string;
+  batch_number:      string;
+  quantity:          number;
+  received_quantity?: number;
 }
 
 export interface StockTransfer {
   id:                      string;
+  transfer_number?:        string;
   source_branch_id:        string;
   source_branch_name:      string;
   destination_branch_id:   string;
@@ -615,8 +928,12 @@ export interface StockTransfer {
   items:                   StockTransferItem[];
   status:                  TransferStatus;
   initiated_by:            string;
+  dispatched_by?:          string | null;
+  dispatched_at?:          string | null;
   confirmed_by?:           string | null;
   confirmed_at?:           string | null;
+  received_by?:            string | null;
+  received_at?:            string | null;
   notes?:                  string | null;
   created_at:              string;
   updated_at:              string;
@@ -650,9 +967,7 @@ export interface Staff {
   created_at: string;
   updated_at: string;
   created_by_id?:   string;
-  created_by_name?: string;
   updated_by_id?:   string;
-  updated_by_name?: string;
 }
 
 export interface Attendance {
@@ -670,9 +985,7 @@ export interface Attendance {
   created_at?: string;
   updated_at?: string;
   created_by_id?:   string;
-  created_by_name?: string;
   updated_by_id?:   string;
-  updated_by_name?: string;
 }
 
 // ─── Payroll ──────────────────────────────────────────────────────────────────
@@ -855,9 +1168,7 @@ export interface CashRegistry {
   created_at:               string;
   updated_at:               string;
   created_by_id?:           string;
-  created_by_name?:         string;
   updated_by_id?:           string;
-  updated_by_name?:         string;
 }
 
 export interface CashRegistryTransaction {
@@ -875,7 +1186,6 @@ export interface CashRegistryTransaction {
   reference_id?:   string;
   created_at:      string;
   created_by_id?:  string;
-  created_by_name?: string;
 }
 
 export interface BankAccount {
@@ -890,9 +1200,7 @@ export interface BankAccount {
   created_at:      string;
   updated_at:      string;
   created_by_id?:  string;
-  created_by_name?: string;
   updated_by_id?:  string;
-  updated_by_name?: string;
 }
 
 export interface BankAccountTransaction {
@@ -908,7 +1216,6 @@ export interface BankAccountTransaction {
   reference_id?:   string;
   created_at:      string;
   created_by_id?:  string;
-  created_by_name?: string;
 }
 
 export interface FundTransfer {
@@ -925,7 +1232,6 @@ export interface FundTransfer {
   branch_id:        string;
   created_at:       string;
   created_by_id?:   string;
-  created_by_name?: string;
 }
 
 // ─── Cheque Books ─────────────────────────────────────────────────────────────
@@ -947,9 +1253,7 @@ export interface ChequeBook {
   created_at:        string;
   updated_at:        string;
   created_by_id?:    string;
-  created_by_name?:  string;
   updated_by_id?:    string;
-  updated_by_name?:  string;
 }
 
 export interface ChequeIssue {
@@ -967,7 +1271,6 @@ export interface ChequeIssue {
   created_at:         string;
   updated_at:         string;
   created_by_id?:     string;
-  created_by_name?:   string;
 }
 
 // ─── POS Machines ────────────────────────────────────────────────────────────
@@ -990,9 +1293,7 @@ export interface PosMachine {
   created_at:        string;
   updated_at:        string;
   created_by_id?:    string;
-  created_by_name?:  string;
   updated_by_id?:    string;
-  updated_by_name?:  string;
 }
 
 export interface PosTransaction {
@@ -1009,7 +1310,6 @@ export interface PosTransaction {
   notes?:           string;
   created_at:       string;
   created_by_id?:   string;
-  created_by_name?: string;
 }
 
 export interface PosSettlement {
@@ -1024,7 +1324,6 @@ export interface PosSettlement {
   notes?:            string;
   created_at:        string;
   created_by_id?:    string;
-  created_by_name?:  string;
 }
 
 // ─── Pagination & API ────────────────────────────────────────────────────────

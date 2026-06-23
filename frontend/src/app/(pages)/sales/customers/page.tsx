@@ -79,7 +79,7 @@ async function exportSelectedPdf(selected: Customer[]) {
     doc.addImage(dataUrl, "PNG", 14, cursorY, 12, 12);
     cursorY += 1;
   } catch {
-    // Logo load failure is non-fatal â€” continue without it.
+    // Logo load failure is non-fatal — continue without it.
   }
 
   doc.setFontSize(13);
@@ -89,7 +89,7 @@ async function exportSelectedPdf(selected: Customer[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Customer Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Customer Report — ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -102,27 +102,27 @@ export default function CustomersPage() {
   const { permissions } = useAuth();
   const canManage = permissions?.isAdmin || permissions?.isManager || permissions?.can("BRANCH_MANAGER");
 
-  // â€” Filter state
+  // — Filter state
   const [statusFilter,   setStatusFilter]   = useState("");
   const [filterVisible,  setFilterVisible]  = useState(false);
 
-  // â€” Modal state
+  // — Modal state
   const [modalOpen,      setModalOpen]      = useState(false);
   const [editCustomer,   setEditCustomer]   = useState<Customer | null>(null);
   const [viewCustomer,   setViewCustomer]   = useState<Customer | null>(null);
   const [confirmToggle,  setConfirmToggle]  = useState<Customer | null>(null);
   const [importOpen,     setImportOpen]     = useState(false);
 
-  // â€” Row selection + export
+  // — Row selection + export
   const [selectedKeys,     setSelectedKeys]     = useState<Set<string>>(new Set());
   const [allPagesSelected, setAllPagesSelected] = useState(false);
   const [isExportingCsv,   setIsExportingCsv]   = useState(false);
 
-  // â€” Pagination
+  // — Pagination
   const { pagination, sort, search, goToPage, changePageSize, handleSort, handleSearch, queryParams } =
     usePagination({ initialSortField: "full_name", initialSortDirection: "asc" });
 
-  // â€” Filters
+  // — Filters
   const activeFilters = {
     ...(statusFilter && { is_active: statusFilter === "true" }),
   };
@@ -140,7 +140,7 @@ export default function CustomersPage() {
     setFilterVisible(false);
   }
 
-  // â€” Data fetching
+  // — Data fetching
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<PaginatedResponse<Customer>>({
@@ -153,7 +153,7 @@ export default function CustomersPage() {
   const totalItems = data?.total        ?? 0;
   const totalPages = data?.total_pages  ?? 1;
 
-  // â€” Toggle-status mutation
+  // — Toggle-status mutation
   const toggleStatusMutation = useMutation({
     mutationFn: (customer: Customer) =>
       apiPatch<Customer>(`/customers/${customer.id}`, { is_active: !customer.is_active }),
@@ -173,7 +173,7 @@ export default function CustomersPage() {
     },
   });
 
-  // â€” Selection helpers
+  // — Selection helpers
   const handleSelectionChange = useCallback((keys: Set<string>) => {
     setSelectedKeys(keys);
     setAllPagesSelected(false);
@@ -189,7 +189,7 @@ export default function CustomersPage() {
   const selectedItems  = customers.filter((c) => selectedKeys.has(c.id));
   const selectionCount = allPagesSelected ? totalItems : selectedKeys.size;
 
-  // â€” Export handlers
+  // — Export handlers
   async function handleExportCsv() {
     if (allPagesSelected) {
       setIsExportingCsv(true);
@@ -222,7 +222,7 @@ export default function CustomersPage() {
     downloadBlob(blob, "customers_import_template.csv");
   }
 
-  // â€” Column definitions
+  // — Column definitions
   const columns: Column<Customer>[] = [
     {
       key:      "full_name",
@@ -238,7 +238,7 @@ export default function CustomersPage() {
     {
       key:    "email",
       header: "Email",
-      render: (c) => <span style={{ color: "var(--color-text-muted)" }}>{c.email ?? "â€”"}</span>,
+      render: (c) => <span style={{ color: "var(--color-text-muted)" }}>{c.email ?? "—"}</span>,
     },
     {
       key:      "credit_limit",
@@ -349,7 +349,7 @@ export default function CustomersPage() {
           </Button>
 
           <SearchBar
-            placeholder="Search by name, phone or emailâ€¦"
+            placeholder="Search by name, phone or email..."
             onSearch={handleSearch}
             className="w-[30rem] max-w-full"
           />
@@ -445,7 +445,7 @@ export default function CustomersPage() {
           )}
         </div>
 
-        {/* Export footer â€” shown only when rows are selected */}
+        {/* Export footer — shown only when rows are selected */}
         {(selectedKeys.size > 0 || allPagesSelected) && (
           <div
             className="border-t flex items-center justify-between px-4 py-3 gap-3"
@@ -504,7 +504,7 @@ export default function CustomersPage() {
         entityName="Customers"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required columns: full_name, phone â€” Optional: email, date_of_birth (yyyy-MM-dd), address, credit_limit"
+        templateNote="Required columns: full_name, phone — Optional: email, date_of_birth (yyyy-MM-dd), address, credit_limit"
       />
 
       <ConfirmModal

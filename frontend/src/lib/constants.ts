@@ -124,28 +124,85 @@ export const SKU_TYPE_FILTER_OPTIONS: { value: SkuType | ""; label: string }[] =
 // ─── Stock Out reasons ────────────────────────────────────────────────────────
 
 export const STOCK_OUT_REASON_OPTIONS: { value: string; label: string }[] = [
-  { value: "DAMAGED", label: "Damaged" },
-  { value: "EXPIRED", label: "Expired" },
-  { value: "OTHER",   label: "Other"   },
+  { value: "DAMAGED",               label: "Damaged" },
+  { value: "EXPIRED",               label: "Expired" },
+  { value: "STOCKTAKE_CORRECTION",  label: "Stocktake Correction" },
+  { value: "LOST",                  label: "Lost" },
+  { value: "OTHER",                 label: "Other" },
 ];
+
+// ─── Stock Movements ─────────────────────────────────────────────────────────
+
+import type { StockMovementType, StockMovementStatus } from "@/types";
+
+export const STOCK_MOVEMENT_TYPE_OPTIONS: { value: StockMovementType | ""; label: string }[] = [
+  { value: "",          label: "All Types"  },
+  { value: "STOCK_IN",  label: "Stock In"   },
+  { value: "STOCK_OUT", label: "Stock Out"  },
+];
+
+export const STOCK_MOVEMENT_STATUS_OPTIONS: { value: StockMovementStatus | ""; label: string }[] = [
+  { value: "",                      label: "All Statuses"        },
+  { value: "CREATED",               label: "Created"             },
+  { value: "PARTIALLY_COMPLETED",   label: "Partially Completed" },
+  { value: "COMPLETED",             label: "Completed"           },
+];
+
+export const STOCK_MOVEMENT_STATUS_LABEL: Record<StockMovementStatus, string> = {
+  CREATED:               "Created",
+  PARTIALLY_COMPLETED:   "Partially Completed",
+  COMPLETED:             "Completed",
+};
+
+export const STOCK_MOVEMENT_TYPE_LABEL: Record<StockMovementType, string> = {
+  STOCK_IN:  "Stock In",
+  STOCK_OUT: "Stock Out",
+};
+
+// ─── Movement Log Types ──────────────────────────────────────────────────────
+
+import type { StockMovementLogType } from "@/types";
+
+export const MOVEMENT_LOG_TYPE_OPTIONS: { value: StockMovementLogType | ""; label: string }[] = [
+  { value: "",              label: "All Types"     },
+  { value: "STOCK_IN",     label: "Stock In"      },
+  { value: "STOCK_OUT",    label: "Stock Out"     },
+  { value: "TRANSFER_IN",  label: "Transfer In"   },
+  { value: "TRANSFER_OUT", label: "Transfer Out"  },
+  { value: "PURCHASE",     label: "Purchase"      },
+  { value: "SALE",         label: "Sale"          },
+];
+
+export const MOVEMENT_LOG_TYPE_LABEL: Record<StockMovementLogType, string> = {
+  STOCK_IN:     "Stock In",
+  STOCK_OUT:    "Stock Out",
+  TRANSFER_IN:  "Transfer In",
+  TRANSFER_OUT: "Transfer Out",
+  PURCHASE:     "Purchase",
+  SALE:         "Sale",
+};
 
 // ─── Transfer status ─────────────────────────────────────────────────────────
 
 import type { TransferStatus } from "@/types";
 
 export const TRANSFER_STATUS_FILTER_OPTIONS: { value: TransferStatus | ""; label: string }[] = [
-  { value: "",           label: "All Statuses" },
-  { value: "PENDING",    label: "Pending"       },
-  { value: "CONFIRMED",  label: "Confirmed"     },
-  { value: "REJECTED",   label: "Rejected"      },
-  { value: "CANCELLED",  label: "Cancelled"     },
+  { value: "",                   label: "All Statuses" },
+  { value: "PENDING",            label: "Pending"            },
+  { value: "IN_TRANSIT",         label: "In Transit"         },
+  { value: "PARTIALLY_RECEIVED", label: "Partially Received" },
+  { value: "RECEIVED",           label: "Received"           },
+  { value: "REJECTED",           label: "Rejected"           },
+  { value: "CANCELLED",          label: "Cancelled"          },
 ];
 
 export const TRANSFER_STATUS_LABEL: Record<TransferStatus, string> = {
-  PENDING:   "Pending",
-  CONFIRMED: "Confirmed",
-  REJECTED:  "Rejected",
-  CANCELLED: "Cancelled",
+  PENDING:            "Pending",
+  IN_TRANSIT:         "In Transit",
+  PARTIALLY_RECEIVED: "Partially Received",
+  RECEIVED:           "Received",
+  REJECTED:           "Rejected",
+  CANCELLED:          "Cancelled",
 };
 
 // ─── GRN / Purchase Invoice Status ────────────────────────────────────────────
@@ -227,14 +284,6 @@ export const PO_STATUS_FILTER_OPTIONS: { value: PurchaseOrderStatus | ""; label:
   { value: "PARTIAL",          label: "Partial"          },
   { value: "RECEIVED",         label: "Received"         },
   { value: "CANCELLED",        label: "Cancelled"        },
-];
-
-// ─── Inventory ────────────────────────────────────────────────────────────────
-
-export const LOW_STOCK_FILTER_OPTIONS = [
-  { value: "",      label: "All Stock Levels" },
-  { value: "true",  label: "Low Stock Only"   },
-  { value: "false", label: "In Stock"         },
 ];
 
 // ─── Payroll ───────────────────────────────────────────────────────────────────
@@ -383,6 +432,112 @@ export const FUND_SOURCE_TYPE_LABEL: Record<FundSourceType, string> = {
   BANK_ACCOUNT:  "Bank Account",
 };
 
+
+// ─── Currency ─────────────────────────────────────────────────────────────────
+
+import type { CurrencyCode, EntityContactTitle } from "@/types";
+
+export const CURRENCY_OPTIONS: { value: CurrencyCode; label: string }[] = [
+  { value: "LKR", label: "LKR — Sri Lankan Rupee" },
+  { value: "USD", label: "USD — US Dollar" },
+  { value: "EUR", label: "EUR — Euro" },
+  { value: "GBP", label: "GBP — British Pound" },
+  { value: "INR", label: "INR — Indian Rupee" },
+];
+
+export const ENTITY_CONTACT_TITLE_OPTIONS: { value: EntityContactTitle; label: string }[] = [
+  { value: "Mr.",   label: "Mr."   },
+  { value: "Mrs.",  label: "Mrs."  },
+  { value: "Ms.",   label: "Ms."   },
+  { value: "Dr.",   label: "Dr."   },
+  { value: "Prof.", label: "Prof." },
+];
+
+// ─── Generics (medicine attributes) ───────────────────────────────────────────
+
+import type { DosageForm, ControlledSchedule } from "@/types";
+
+export const DOSAGE_FORM_OPTIONS: { value: DosageForm; label: string }[] = [
+  { value: "TABLET",       label: "Tablet" },
+  { value: "CAPSULE",      label: "Capsule" },
+  { value: "SYRUP",        label: "Syrup" },
+  { value: "INJECTION",    label: "Injection" },
+  { value: "CREAM",        label: "Cream" },
+  { value: "OINTMENT",     label: "Ointment" },
+  { value: "DROPS",        label: "Drops" },
+  { value: "INHALER",      label: "Inhaler" },
+  { value: "SUPPOSITORY",  label: "Suppository" },
+  { value: "PATCH",        label: "Patch" },
+  { value: "POWDER",       label: "Powder" },
+  { value: "SOLUTION",     label: "Solution" },
+  { value: "SUSPENSION",   label: "Suspension" },
+  { value: "GEL",          label: "Gel" },
+  { value: "SPRAY",        label: "Spray" },
+  { value: "LOZENGE",      label: "Lozenge" },
+  { value: "OTHER",        label: "Other" },
+];
+
+export const CONTROLLED_SCHEDULE_OPTIONS: { value: ControlledSchedule; label: string }[] = [
+  { value: "NONE",         label: "None" },
+  { value: "SCHEDULE_I",   label: "Schedule I" },
+  { value: "SCHEDULE_II",  label: "Schedule II" },
+  { value: "SCHEDULE_III", label: "Schedule III" },
+  { value: "SCHEDULE_IV",  label: "Schedule IV" },
+  { value: "SCHEDULE_V",   label: "Schedule V" },
+];
+
+// ─── Pharma Countries ────────────────────────────────────────────────────────
+
+export const PHARMA_COUNTRY_OPTIONS: { value: string; label: string }[] = [
+  { value: "India",        label: "India" },
+  { value: "USA",          label: "USA" },
+  { value: "China",        label: "China" },
+  { value: "Germany",      label: "Germany" },
+  { value: "Switzerland",  label: "Switzerland" },
+  { value: "UK",           label: "UK" },
+  { value: "France",       label: "France" },
+  { value: "Japan",        label: "Japan" },
+  { value: "Ireland",      label: "Ireland" },
+  { value: "South Korea",  label: "South Korea" },
+  { value: "Italy",        label: "Italy" },
+  { value: "Canada",       label: "Canada" },
+  { value: "Israel",       label: "Israel" },
+  { value: "Denmark",      label: "Denmark" },
+  { value: "Australia",    label: "Australia" },
+  { value: "Belgium",      label: "Belgium" },
+  { value: "Netherlands",  label: "Netherlands" },
+  { value: "Sri Lanka",    label: "Sri Lanka" },
+  { value: "Bangladesh",   label: "Bangladesh" },
+  { value: "Pakistan",     label: "Pakistan" },
+];
+
+// ─── Credit Notes ─────────────────────────────────────────────────────────────
+
+import type { CreditNoteStatus } from "@/types";
+
+export const CREDIT_NOTE_STATUS_OPTIONS: { value: CreditNoteStatus | ""; label: string }[] = [
+  { value: "",          label: "All Statuses" },
+  { value: "DRAFT",     label: "Draft"        },
+  { value: "APPROVED",  label: "Approved"     },
+  { value: "APPLIED",   label: "Applied"      },
+  { value: "CANCELLED", label: "Cancelled"    },
+];
+
+export const CREDIT_NOTE_STATUS_LABEL: Record<CreditNoteStatus, string> = {
+  DRAFT:     "Draft",
+  APPROVED:  "Approved",
+  APPLIED:   "Applied",
+  CANCELLED: "Cancelled",
+};
+
+// ─── Promotions ───────────────────────────────────────────────────────────────
+
+import type { PromotionType } from "@/types";
+
+export const PROMOTION_TYPE_OPTIONS: { value: PromotionType; label: string }[] = [
+  { value: "PERCENTAGE",     label: "Percentage Discount" },
+  { value: "BONUS_QUANTITY", label: "Bonus Quantity (Buy X Get Y)" },
+];
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 

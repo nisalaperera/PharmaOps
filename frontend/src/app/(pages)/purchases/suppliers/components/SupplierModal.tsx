@@ -25,7 +25,7 @@ export function SupplierModal({ isOpen, onClose, editingSupplier }: SupplierModa
 
   const form = useForm<SupplierFormValues>({
     resolver:      zodResolver(supplierSchema),
-    defaultValues: { supplier_type: "DISTRIBUTOR", short_name: "", legal_name: "", registration_number: "" },
+    defaultValues: { supplier_type: "DISTRIBUTOR", name: "", legal_name: "", registration_number: "", credit_term_days: 30, credit_limit: undefined, notes: "" },
   });
 
   const watchedType = form.watch("supplier_type");
@@ -35,12 +35,15 @@ export function SupplierModal({ isOpen, onClose, editingSupplier }: SupplierModa
     if (isEditing) {
       form.reset({
         supplier_type:       editingSupplier.supplier_type,
-        short_name:          editingSupplier.short_name,
+        name:                editingSupplier.name,
         legal_name:          editingSupplier.legal_name,
         registration_number: editingSupplier.registration_number ?? "",
+        credit_term_days:    editingSupplier.credit_term_days ?? 30,
+        credit_limit:        editingSupplier.credit_limit ?? undefined,
+        notes:               editingSupplier.notes ?? "",
       });
     } else {
-      form.reset({ supplier_type: "DISTRIBUTOR", short_name: "", legal_name: "", registration_number: "" });
+      form.reset({ supplier_type: "DISTRIBUTOR", name: "", legal_name: "", registration_number: "", credit_term_days: 30, credit_limit: undefined, notes: "" });
     }
   }, [isOpen, editingSupplier]);
 
@@ -55,8 +58,8 @@ export function SupplierModal({ isOpen, onClose, editingSupplier }: SupplierModa
         "success",
         isEditing ? "Supplier Updated" : "Supplier Created",
         isEditing
-          ? `${result.short_name} has been updated.`
-          : `${result.short_name} has been created. Add channels from the supplier list.`,
+          ? `${result.name} has been updated.`
+          : `${result.name} has been created. Add channels from the supplier list.`,
       );
       onClose();
     },
@@ -109,10 +112,11 @@ export function SupplierModal({ isOpen, onClose, editingSupplier }: SupplierModa
 
         {/* ── Basic Info ─────────────────────────────────────────────────── */}
         <Input
-          label="Short Name"
+          label="Name"
           placeholder="e.g. MedPharm"
-          {...form.register("short_name")}
-          error={form.formState.errors.short_name?.message}
+          required
+          {...form.register("name")}
+          error={form.formState.errors.name?.message}
         />
         <Input
           label="Legal Name"
@@ -126,6 +130,34 @@ export function SupplierModal({ isOpen, onClose, editingSupplier }: SupplierModa
           {...form.register("registration_number")}
           error={form.formState.errors.registration_number?.message}
         />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Input
+            label="Credit Term Days"
+            type="number"
+            placeholder="30"
+            {...form.register("credit_term_days")}
+            error={form.formState.errors.credit_term_days?.message}
+          />
+          <Input
+            label="Credit Limit"
+            type="number"
+            step="0.01"
+            placeholder="Optional"
+            {...form.register("credit_limit")}
+            error={form.formState.errors.credit_limit?.message}
+          />
+        </div>
+
+        <div>
+          <label className="form-label">Notes</label>
+          <textarea
+            placeholder="Optional notes about this supplier"
+            rows={2}
+            className="form-input resize-none"
+            {...form.register("notes")}
+          />
+        </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>

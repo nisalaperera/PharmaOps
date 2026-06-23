@@ -84,11 +84,11 @@ export function CashRegistryViewModal({ isOpen, onClose, registry }: CashRegistr
           <Field label="Updated">
             {registry.updated_at ? formatDateTime(registry.updated_at) : <EmptyValue />}
           </Field>
-          {registry.created_by_name && (
-            <Field label="Created By">{registry.created_by_name}</Field>
+          {registry.created_by_id && (
+            <Field label="Created By">{registry.created_by_id}</Field>
           )}
-          {registry.updated_by_name && (
-            <Field label="Updated By">{registry.updated_by_name}</Field>
+          {registry.updated_by_id && (
+            <Field label="Updated By">{registry.updated_by_id}</Field>
           )}
         </div>
 

@@ -17,6 +17,7 @@ import { useAuth }                from "@/hooks/useAuth";
 import { usePagination }          from "@/hooks/usePagination";
 import { apiGet, apiPatch, apiDownloadFile, apiUploadFile, downloadBlob } from "@/lib/api-client";
 import { showToast }              from "@/lib/toast";
+import { formatAmount }           from "@/lib/utils";
 import { ACTIVE_STATUS_OPTIONS }  from "@/lib/constants";
 import APP_CONFIG                 from "@/lib/config";
 import { CategoryModal }          from "./components/CategoryModal";
@@ -53,8 +54,15 @@ function exportDateStamp(): string {
 }
 
 function exportCategoriesCsv(categories: ProductCategory[]) {
-  const header  = ["name", "parent", "description"];
-  const rows    = categories.map((c) => [c.name, c.parent_name ?? "", c.description ?? ""]);
+  const header  = ["Name", "Parent", "Default Margin %", "Effective Margin %", "Discount Applicable", "Status"];
+  const rows    = categories.map((c) => [
+    c.name,
+    c.parent_name ?? "",
+    c.default_margin_percentage != null ? formatAmount(c.default_margin_percentage) : "",
+    c.effective_margin_percentage != null ? formatAmount(c.effective_margin_percentage) : "",
+    c.is_discount_applicable ? "Yes" : "No",
+    c.is_active ? "Active" : "Inactive",
+  ]);
   const csvText = [header, ...rows]
     .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
     .join("\n");
@@ -63,8 +71,15 @@ function exportCategoriesCsv(categories: ProductCategory[]) {
 
 async function exportCategoriesPdf(categories: ProductCategory[]) {
   const doc     = new jsPDF();
-  const headers = [["Category Name", "Parent", "Description"]];
-  const body    = categories.map((c) => [c.name, c.parent_name ?? "-", c.description ?? ""]);
+  const headers = [["Category Name", "Parent", "Margin %", "Eff. Margin %", "Discount", "Status"]];
+  const body    = categories.map((c) => [
+    c.name,
+    c.parent_name ?? "-",
+    c.default_margin_percentage != null ? `${formatAmount(c.default_margin_percentage)}%` : "-",
+    c.effective_margin_percentage != null ? `${formatAmount(c.effective_margin_percentage)}%` : "-",
+    c.is_discount_applicable ? "Yes" : "No",
+    c.is_active ? "Active" : "Inactive",
+  ]);
 
   let cursorY = 14;
   try {
@@ -88,7 +103,7 @@ async function exportCategoriesPdf(categories: ProductCategory[]) {
 
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text(`Categories Report â€” ${exportDateStamp()}`, 14, cursorY + 4);
+  doc.text(`Categories Report — ${exportDateStamp()}`, 14, cursorY + 4);
   cursorY += 10;
 
   autoTable(doc, { head: headers, body, startY: cursorY, styles: { fontSize: 8 } });
@@ -125,7 +140,7 @@ export default function CategoriesPage() {
   function clearFilters() { setStatusFilter(""); goToPage(1); }
   function hideFilters()  { clearFilters(); setFilterVisible(false); }
 
-  // When searching/filtering â€” flat list; otherwise â€” depth-first tree order
+  // When searching/filtering — flat list; otherwise — depth-first tree order
   const treeRows = useMemo<CategoryTreeRow[]>(() => {
     const q = search.trim().toLowerCase();
     const statusFiltered = categories.filter((c) =>
@@ -137,7 +152,6 @@ export default function CategoriesPage() {
       return statusFiltered
         .filter((c) =>
           c.name.toLowerCase().includes(q) ||
-          (c.description?.toLowerCase().includes(q) ?? false) ||
           (c.parent_name?.toLowerCase().includes(q) ?? false)
         )
         .map((c) => ({ ...c, depth: 0 }));
@@ -221,17 +235,39 @@ export default function CategoriesPage() {
       header: "Parent",
       render: (row) => (
         <span className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-          {row.parent_name || "â€”"}
+          {row.parent_name || "—"}
         </span>
       ),
     },
     {
-      key:    "description",
-      header: "Description",
+      key:    "effective_margin_percentage",
+      header: "Margin %",
+      width:  "110px",
+      render: (row) => {
+        const isOwn       = row.default_margin_percentage != null;
+        const isInherited = !isOwn && row.effective_margin_percentage != null;
+        return (
+          <div className="text-sm tabular-nums">
+            {row.effective_margin_percentage != null ? (
+              <span className={isInherited ? "italic" : "font-semibold"} style={{ color: isInherited ? "var(--color-text-muted)" : "var(--color-text)" }}>
+                {formatAmount(row.effective_margin_percentage)}%
+                {isInherited && <span className="text-[10px] ml-1">(inherited)</span>}
+              </span>
+            ) : (
+              <span style={{ color: "var(--color-text-muted)" }}>—</span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key:    "is_discount_applicable",
+      header: "Discount",
+      width:  "100px",
       render: (row) => (
-        <p className="text-sm truncate max-w-[360px]" style={{ color: "var(--color-text-muted)" }}>
-          {row.description || "-"}
-        </p>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${row.is_discount_applicable ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+          {row.is_discount_applicable ? "Yes" : "No"}
+        </span>
       ),
     },
     {
@@ -313,7 +349,7 @@ export default function CategoriesPage() {
             )}
           </Button>
           <SearchBar
-            placeholder="Search categoriesâ€¦"
+            placeholder="Search categories..."
             onSearch={handleSearch}
             className="w-[22rem] max-w-full"
           />
@@ -442,7 +478,7 @@ export default function CategoriesPage() {
         entityName="Categories"
         onImport={handleImport}
         onDownloadTemplate={handleDownloadTemplate}
-        templateNote="Required: name. Optional: description."
+        templateNote="Required: name. Optional: parent_name, is_discount_applicable (TRUE/FALSE), default_margin_percentage, is_active."
       />
 
       <ConfirmModal

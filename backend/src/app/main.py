@@ -1,6 +1,8 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from app.core.config import get_settings
 from app.core.database import get_db, Collections
 from app.api.v1 import (
@@ -8,7 +10,8 @@ from app.api.v1 import (
     suppliers, purchase_orders, purchase_invoices, sales, sales_orders, prescriptions,
     patients, customers, doctors, stock_transfer, staff, payroll,
     reports, notifications, audit_log, preferences, billing, treasury, cheques, pos_machines,
-    dashboard,
+    dashboard, chain, stock_locations, rep_visits, purchase_credit_notes, uploads,
+    stock_movements,
 )
 
 settings = get_settings()
@@ -76,6 +79,7 @@ API_PREFIX = "/api/v1"
 
 app.include_router(auth.router,             prefix=API_PREFIX)
 app.include_router(users.router,            prefix=API_PREFIX)
+app.include_router(chain.router,            prefix=API_PREFIX)
 app.include_router(branches.router,         prefix=API_PREFIX)
 app.include_router(products.router,         prefix=API_PREFIX)
 app.include_router(inventory.router,        prefix=API_PREFIX)
@@ -100,6 +104,21 @@ app.include_router(treasury.router,         prefix=API_PREFIX)
 app.include_router(cheques.router,          prefix=API_PREFIX)
 app.include_router(pos_machines.router,     prefix=API_PREFIX)
 app.include_router(dashboard.router,        prefix=API_PREFIX)
+app.include_router(stock_locations.router,  prefix=API_PREFIX)
+app.include_router(rep_visits.router,       prefix=API_PREFIX)
+app.include_router(purchase_credit_notes.router, prefix=API_PREFIX)
+app.include_router(uploads.router,              prefix=API_PREFIX)
+app.include_router(stock_movements.router,       prefix=API_PREFIX)
+
+
+# ─── Health check ─────────────────────────────────────────────────────────────
+
+# ─── Static files (uploads) ──────────────────────────────────────────────────
+
+_UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "uploads")
+os.makedirs(os.path.join(_UPLOADS_DIR, "logos"), exist_ok=True)
+os.makedirs(os.path.join(_UPLOADS_DIR, "images"), exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=_UPLOADS_DIR), name="uploads")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

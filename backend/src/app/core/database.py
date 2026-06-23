@@ -64,6 +64,7 @@ def build_search_filter(search: str | None, fields: list[str]) -> dict:
 # ─── Collection names (single source of truth) ───────────────────────────────
 
 class Collections:
+    CHAIN           = "chain"
     USERS           = "users"
     BRANCHES        = "branches"
     PRODUCTS        = "products"
@@ -101,4 +102,9 @@ class Collections:
     SALES_ORDERS                 = "sales_orders"
     PURCHASE_INVOICES            = "purchase_invoices"
     PURCHASE_PAYMENTS            = "purchase_payments"
+    PURCHASE_CREDIT_NOTES        = "purchase_credit_notes"
+    STOCK_LOCATIONS               = "stock_locations"
+    STOCK_MOVEMENT_LOGS          = "stock_movement_logs"
+    STOCK_MOVEMENTS              = "stock_movements"
+    REP_VISITS                   = "channel_rep_visits"
     SEQUENCES                    = "sequences"

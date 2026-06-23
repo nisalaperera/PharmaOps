@@ -215,7 +215,7 @@ export function POModal({ isOpen, onClose, editingPO }: POModalProps) {
                 >
                   <option value="">Select supplier…</option>
                   {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.short_name}</option>
+                    <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               )}
