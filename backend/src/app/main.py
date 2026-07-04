@@ -7,11 +7,11 @@ from app.core.config import get_settings
 from app.core.database import get_db, Collections
 from app.api.v1 import (
     auth, users, branches, products, inventory,
-    suppliers, purchase_orders, purchase_invoices, sales, sales_orders, prescriptions,
+    suppliers, promotions, purchase_orders, purchase_invoices, sales, sales_orders, prescriptions,
     patients, customers, doctors, stock_transfer, staff, payroll,
     reports, notifications, audit_log, preferences, billing, treasury, cheques, pos_machines,
     dashboard, chain, stock_locations, rep_visits, purchase_credit_notes, uploads,
-    stock_movements,
+    stock_movements, ocr, purchase_returns, ledger,
 )
 
 settings = get_settings()
@@ -82,8 +82,12 @@ app.include_router(users.router,            prefix=API_PREFIX)
 app.include_router(chain.router,            prefix=API_PREFIX)
 app.include_router(branches.router,         prefix=API_PREFIX)
 app.include_router(products.router,         prefix=API_PREFIX)
+# stock_transfer must precede inventory: its literal /inventory/stock-transfers
+# paths would otherwise be captured by inventory's /inventory/{inventory_id}.
+app.include_router(stock_transfer.router,   prefix=API_PREFIX)
 app.include_router(inventory.router,        prefix=API_PREFIX)
 app.include_router(suppliers.router,        prefix=API_PREFIX)
+app.include_router(promotions.router,      prefix=API_PREFIX)
 app.include_router(purchase_orders.router,  prefix=API_PREFIX)
 app.include_router(purchase_invoices.router, prefix=API_PREFIX)
 app.include_router(sales.router,            prefix=API_PREFIX)
@@ -93,7 +97,6 @@ app.include_router(billing.router,          prefix=API_PREFIX)
 app.include_router(customers.router,        prefix=API_PREFIX)
 app.include_router(patients.router,         prefix=API_PREFIX)
 app.include_router(doctors.router,          prefix=API_PREFIX)
-app.include_router(stock_transfer.router,   prefix=API_PREFIX)
 app.include_router(staff.router,            prefix=API_PREFIX)
 app.include_router(payroll.router,          prefix=API_PREFIX)
 app.include_router(reports.router,          prefix=API_PREFIX)
@@ -107,8 +110,11 @@ app.include_router(dashboard.router,        prefix=API_PREFIX)
 app.include_router(stock_locations.router,  prefix=API_PREFIX)
 app.include_router(rep_visits.router,       prefix=API_PREFIX)
 app.include_router(purchase_credit_notes.router, prefix=API_PREFIX)
+app.include_router(purchase_returns.router,      prefix=API_PREFIX)
 app.include_router(uploads.router,              prefix=API_PREFIX)
 app.include_router(stock_movements.router,       prefix=API_PREFIX)
+app.include_router(ocr.router,                   prefix=API_PREFIX)
+app.include_router(ledger.router,                prefix=API_PREFIX)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────

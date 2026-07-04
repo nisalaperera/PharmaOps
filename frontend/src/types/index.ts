@@ -21,7 +21,7 @@ export type PurchaseOrderStatus =
   | "CANCELLED";
 
 export type GRNStatus                     = "PENDING" | "COMPLETED" | "PARTIAL";
-export type PurchaseInvoiceStatus         = "DRAFT" | "RECEIVED" | "VERIFIED";
+export type PurchaseInvoiceStatus         = "DRAFT" | "RECEIVED" | "PARTIALLY_VERIFIED" | "VERIFIED";
 export type PurchaseInvoicePaymentStatus  = "UNPAID" | "PARTIALLY_PAID" | "PAID";
 export type PurchasePaymentMethod         = "CASH" | "CHEQUE" | "BANK_TRANSFER";
 export type SalesOrderStatus              = "DRAFT" | "CONFIRMED" | "INVOICED" | "CANCELLED";
@@ -33,7 +33,7 @@ export type ChequeStatus = "PENDING" | "CLEARED" | "BOUNCED";
 
 export type TransferStatus = "PENDING" | "IN_TRANSIT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "REJECTED" | "CANCELLED";
 
-export type StockMovementLogType = "STOCK_IN" | "STOCK_OUT" | "TRANSFER_IN" | "TRANSFER_OUT" | "PURCHASE" | "SALE";
+export type StockMovementLogType = "STOCK_IN" | "STOCK_OUT" | "TRANSFER_IN" | "TRANSFER_OUT" | "PURCHASE" | "SALE" | "PURCHASE_RETURN";
 
 export type StockMovementType   = "STOCK_IN" | "STOCK_OUT";
 export type StockMovementStatus = "CREATED" | "PARTIALLY_COMPLETED" | "COMPLETED";
@@ -113,6 +113,7 @@ export interface ChainSettings {
   default_currency:       CurrencyCode;
   low_stock_threshold:    number;
   expiry_alert_days:      number;
+  payment_due_notify_days?: number | null;
   loyalty_points_rate?:   number | null;
   tax_enabled:            boolean;
   is_discount_applicable: boolean;
@@ -252,7 +253,6 @@ export interface ProductGeneric {
   dosage_form?:                   DosageForm | null;
   requires_prescription:          boolean;
   controlled_substance_schedule?: ControlledSchedule | null;
-  active_ingredients:             string[];
   side_effects:                   string[];
   drug_interactions:              string[];
   local_license_number?:          string | null;
@@ -295,6 +295,17 @@ export interface ProductSku {
   updated_by_id?:   string;
 }
 
+export interface ProductAgency {
+  id:             string;
+  name:           string;
+  legal_name?:    string | null;
+  is_active:      boolean;
+  created_at?:    string;
+  updated_at?:    string;
+  created_by_id?: string;
+  updated_by_id?: string;
+}
+
 export interface SkuMapping {
   sku:              string;
   mapped_sku:       string;
@@ -313,6 +324,8 @@ export interface Product {
   category_name:           string;
   basic_sku_id:            string;
   basic_sku_name:          string;
+  agency_id?:              string | null;
+  agency_name:             string;
   barcode?:                string;
   description?:            string | null;
   image?:                  string | null;
@@ -329,43 +342,46 @@ export interface Product {
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
+export interface BatchComment {
+  staff_name: string;
+  text:       string;
+  created_at: string;
+}
+
 export interface InventoryBatch {
   batch_number:             string;
   expiry_date:              string;
-  quantity:                 number;
-  received_quantity?:       number;
-  basic_sku?:               string | null;
   basic_sku_quantity:       number;
   basic_sku_selling_price:  number;
   basic_sku_purchase_price: number;
-  manufacture_date?:        string | null;
-  channel_id?:              string | null;
-  purchase_invoice_id?:     string | null;
+  comments:                 BatchComment[];
 }
 
-export interface StockMovementLog {
-  id:                       string;
-  branch_id:                string;
-  product_id:               string;
-  product_name:             string;
-  batch_number:             string;
-  expiry_date?:             string | null;
-  sku?:                     string | null;
-  quantity:                 number;
-  purchase_price?:          number | null;
-  selling_price?:           number | null;
-  basic_sku?:               string | null;
-  basic_sku_count?:         number | null;
-  basic_sku_quantity?:      number | null;
-  basic_sku_selling_price?: number | null;
+export interface InventoryLog {
+  id:                        string;
+  branch_id:                 string;
+  product_id:                string;
+  batch_number:              string;
+  expiry_date?:              string | null;
+  sku?:                      string | null;
+  sku_id?:                   string | null;
+  quantity:                  number;
+  selling_price?:            number | null;
+  purchase_price?:           number | null;
+  basic_sku?:                string | null;
+  basic_sku_id?:             string | null;
+  basic_sku_count?:          number | null;
+  basic_sku_quantity?:       number | null;
+  basic_sku_selling_price?:  number | null;
   basic_sku_purchase_price?: number | null;
-  stock_location_id?:       string | null;
-  movement_type:            StockMovementLogType;
-  reason?:                  string | null;
-  notes?:                   string | null;
-  reference_id?:            string | null;
-  reference_type?:          string | null;
-  created_at?:              string;
+  stock_location_id?:        string | null;
+  movement_type:             StockMovementLogType;
+  reason?:                   string | null;
+  notes?:                    string | null;
+  reference_id?:             string | null;
+  reference_type?:           string | null;
+  reference_value?:          string | null;
+  created_at?:               string;
 }
 
 export interface LocationSuggestion {
@@ -375,39 +391,36 @@ export interface LocationSuggestion {
 }
 
 export interface InventoryItem {
-  id:                       string;
-  branch_id:                string;
-  product_id:               string;
-  product_name:             string;
-  basic_sku?:               string | null;
+  id:            string;
+  branch_id:     string;
+  product_id:    string;
+  product_name:  string;
+  basic_sku:     string;
+  basic_sku_id:  string;
+  batches:       InventoryBatch[];
+  created_at?:   string;
+  updated_at?:   string;
+}
+
+export interface LatestStockIn {
+  found:                    boolean;
+  batch_number:             string;
+  expiry_date:              string;
+  sku?:                     string | null;
+  selling_price:            number;
+  purchase_price:           number;
   basic_sku_count:          number;
-  batches:                  InventoryBatch[];
-  basic_sku_total_quantity: number;
-  created_at?:              string;
-  updated_at?:              string;
+  basic_sku_selling_price:  number;
+  basic_sku_purchase_price: number;
 }
 
 // ─── Supplier ─────────────────────────────────────────────────────────────────
 
-export type SupplierType      = "AGENCY" | "DISTRIBUTOR";
-export type ChannelCategory   = "AGENCY" | "SUB";
+export type ChannelType       = "AGENCY" | "SUB";
 export type ContactType       = "SALES" | "DELIVERY";
 export type ContactTitle      = "Mr." | "Mrs." | "Ms." | "Dr." | "Prof.";
 export type DeliveryFrequency = "DAILY" | "WEEKLY" | "BI_WEEKLY" | "MONTHLY" | "AS_NEEDED";
 export type PromotionType    = "PERCENTAGE" | "BONUS_QUANTITY";
-
-export interface ChannelPromotion {
-  id?:               string;
-  name:              string;
-  promotion_type:    PromotionType;
-  discount_percent?: number | null;
-  buy_quantity?:     number | null;
-  free_quantity?:    number | null;
-  is_default:        boolean;
-  valid_from?:       string | null;
-  valid_to?:         string | null;
-  is_active:         boolean;
-}
 
 export interface ChannelContact {
   id?:          string;
@@ -421,39 +434,46 @@ export interface ChannelContact {
 }
 
 export interface ChannelProductMapping {
-  product_id:            string;
-  product_name:          string;
-  sort_order:            number;
-  cost_price?:           number | null;
-  pack_sku_id?:          string | null;
-  pack_sku_name?:        string | null;
-  default_promotion_ids: string[];
+  product_id: string;
 }
 
-export interface AgencyChannel {
-  id?:              string;
-  channel_name:     string;
-  contacts:         ChannelContact[];
-  entity_contacts:  EntityContact[];
-  credit_term_days: number;
-  credit_limit?:    number | null;
-  promotions:       ChannelPromotion[];
-  product_mappings: ChannelProductMapping[];
+export interface PromotionTemplate {
+  id:                string;
+  branch_id:         string;
+  name:              string;
+  promotion_type:    PromotionType;
+  discount_percent?: number | null;
+  buy_quantity?:     number | null;
+  free_quantity?:    number | null;
+  is_active:         boolean;
+  created_at?:       string;
+  updated_at?:       string;
+  created_by_name?:  string;
+  updated_by_name?:  string;
 }
 
-export interface DistributorChannel {
-  id?:                string;
-  channel_name:       string;
-  channel_category:   ChannelCategory;
-  agency_id?:         string;
-  agency_name?:       string;
-  credit_term_days:   number;
-  credit_limit?:      number | null;
-  delivery_frequency: DeliveryFrequency;
-  contacts:           ChannelContact[];
-  entity_contacts:    EntityContact[];
-  promotions:         ChannelPromotion[];
-  product_mappings:   ChannelProductMapping[];
+export interface PromotionOption {
+  id:                string;
+  name:              string;
+  promotion_type:    PromotionType;
+  discount_percent?: number | null;
+  buy_quantity?:     number | null;
+  free_quantity?:    number | null;
+}
+
+export interface Channel {
+  id?:                        string;
+  channel_name:               string;
+  channel_type:               ChannelType;
+  agency_id?:                 string;
+  agency_name?:               string;
+  credit_term_days:           number;
+  credit_limit?:              number | null;
+  delivery_frequency?:        DeliveryFrequency;
+  contacts:                   ChannelContact[];
+  entity_contacts:            EntityContact[];
+  product_mappings:           ChannelProductMapping[];
+  use_product_mappings_only:  boolean;
 }
 
 export interface ExpiryAlertConfig {
@@ -464,7 +484,6 @@ export interface ExpiryAlertConfig {
 
 export interface Supplier {
   id:                    string;
-  supplier_type:         SupplierType;
   name:                  string;
   legal_name:            string;
   registration_number?:  string;
@@ -473,8 +492,7 @@ export interface Supplier {
   credit_limit?:         number | null;
   outstanding_balance:   number;
   notes?:                string | null;
-  agency_channels:       AgencyChannel[];
-  distributor_channels:  DistributorChannel[];
+  channels:              Channel[];
   expiry_alert_configs:  ExpiryAlertConfig[];
   is_active:             boolean;
   short_name?:           string;
@@ -526,6 +544,66 @@ export interface PurchaseCreditNote {
   created_by_id?:       string;
 }
 
+// ─── Purchase Returns ────────────────────────────────────────────────────────
+
+export type PurchaseReturnStatus = "PENDING" | "ACCEPTED" | "REJECTED";
+
+export interface PurchaseReturnLineItem {
+  item_id:                 string;
+  product_id:              string;
+  product_name:            string;
+  sku:                     string;
+  batch_number:            string;
+  expiry_date:             string;
+  quantity:                number;
+  unit_price:              number;
+  line_total:              number;
+  status:                  PurchaseReturnStatus;
+  applied_invoice_id?:     string | null;
+  applied_invoice_number?: string | null;
+  applied_amount:          number;
+  decided_by?:             string | null;
+  decided_at?:             string | null;
+}
+
+export interface PurchaseReturn {
+  id:                      string;
+  return_number:           string;
+  branch_id:               string;
+  supplier_id:             string;
+  supplier_name:           string;
+  channel_id:              string;
+  channel_name:            string;
+  return_date:             string;
+  items:                   PurchaseReturnLineItem[];
+  total_amount:            number;
+  status:                  PurchaseReturnStatus;
+  source_invoice_id?:      string | null;
+  source_invoice_number?:  string | null;
+  notes?:                  string | null;
+  created_at?:             string;
+  updated_at?:             string;
+}
+
+/** Flattened available return line item (GET /purchases/returns/available). */
+export interface AvailableReturnItem {
+  return_id:              string;
+  return_number:          string;
+  return_date:            string;
+  source_invoice_number?: string | null;
+  supplier_id:            string;
+  item_id:                string;
+  product_id:             string;
+  product_name:           string;
+  sku:                    string;
+  batch_number:           string;
+  expiry_date:            string;
+  quantity:               number;
+  unit_price:             number;
+  line_total:             number;
+  status:                 PurchaseReturnStatus;
+}
+
 // ─── Rep Visits ──────────────────────────────────────────────────────────────
 
 export interface RepVisit {
@@ -562,8 +640,11 @@ export interface PurchaseOrderReturnItem {
   product_id:    string;
   product_name:  string;
   sku:           string;
+  batch_number:  string;
+  expiry_date:   string;
   unit_quantity: number;
   free_quantity: number;
+  discount:      number;
   unit_price:    number;
   line_total:    number;
 }
@@ -627,26 +708,32 @@ export interface PaymentEntry {
 }
 
 export interface PurchaseInvoiceItem {
-  product_id:    string;
-  product_name:  string;
-  sku:           string;
-  batch_number:  string;
-  expiry_date:   string;
-  unit_quantity: number;
-  free_quantity: number;
-  discount:      number;
-  unit_price:    number;
-  selling_price: number;
-  line_total:    number;
+  product_id:          string;
+  product_name:        string;
+  sku:                 string;
+  batch_number:        string;
+  expiry_date:         string;
+  unit_quantity:       number;
+  free_quantity:       number;
+  discount:            number;
+  unit_price:          number;
+  selling_price:       number;
+  line_total:          number;
+  confirmed_quantity:  number;
+  stock_location_id?:  string | null;
+  is_confirmed:        boolean;
 }
 
 export interface PurchaseReturnItem {
-  product_id:   string;
-  product_name: string;
-  batch_number: string;
-  quantity:     number;
-  unit_price:   number;
-  line_total:   number;
+  product_id:          string;
+  product_name:        string;
+  batch_number:        string;
+  quantity:            number;
+  unit_price:          number;
+  line_total:          number;
+  confirmed_quantity:  number;
+  stock_location_id?:  string | null;
+  is_confirmed:        boolean;
 }
 
 export interface PurchaseInvoice {
@@ -664,6 +751,7 @@ export interface PurchaseInvoice {
   distributor_invoice_date?: string | null;
   items:                    PurchaseInvoiceItem[];
   return_items:             PurchaseReturnItem[];
+  applied_return_item_ids:  string[];
   manual_total_amount?:     number | null;
   manual_return_amount?:    number | null;
   total_amount:             number;
@@ -875,8 +963,8 @@ export interface CustomerLedger {
 
 export interface StockMovementItem {
   product_id:               string;
-  product_name:             string;
   sku:                      string;
+  sku_id?:                  string | null;
   batch_number:             string;
   expiry_date:              string;
   quantity:                 number;
@@ -884,12 +972,12 @@ export interface StockMovementItem {
   purchase_price:           number;
   selling_price:            number;
   basic_sku?:               string | null;
+  basic_sku_id?:            string | null;
   basic_sku_count:          number;
   basic_sku_quantity:       number;
   basic_sku_selling_price:  number;
   basic_sku_purchase_price: number;
   stock_location_id?:       string | null;
-  stock_location_name?:     string | null;
   is_confirmed:             boolean;
   reason?:                  string | null;
 }
@@ -1155,6 +1243,22 @@ export type RegistryTransactionType =
 
 export type FundSourceType = "CASH_REGISTRY" | "BANK_ACCOUNT";
 
+export interface Denominations {
+  note_5000: number;
+  note_2000: number;
+  note_1000: number;
+  note_500:  number;
+  note_100:  number;
+  note_50:   number;
+  note_20:   number;
+  note_10:   number;
+  coin_20:   number;
+  coin_10:   number;
+  coin_5:    number;
+  coin_2:    number;
+  coin_1:    number;
+}
+
 export interface CashRegistry {
   id:                       string;
   name:                     string;
@@ -1162,13 +1266,55 @@ export interface CashRegistry {
   branch_name:              string;
   responsible_staff_id?:    string;
   responsible_staff_name?:  string;
+  ledger_account_id?:       string;
+  ledger_account_code?:     string;
+  ledger_account_name?:     string;
   current_balance:          number;
+  current_session_id?:      string;
   is_open:                  boolean;
   is_active:                boolean;
   created_at:               string;
   updated_at:               string;
   created_by_id?:           string;
   updated_by_id?:           string;
+}
+
+export interface CashRegistrySession {
+  id:                    string;
+  registry_id:           string;
+  registry_name:         string;
+  branch_id:             string;
+  session_date:          string;
+  status:                "OPEN" | "CLOSED";
+  opening_denominations: Denominations;
+  opening_balance:       number;
+  opening_notes?:        string;
+  opened_at:             string;
+  opened_by_id?:         string;
+  opened_by_name?:       string;
+  closing_denominations?: Denominations;
+  closing_balance?:      number;
+  expected_balance?:     number;
+  variance?:             number;
+  closing_notes?:        string;
+  closed_at?:            string;
+  closed_by_id?:         string;
+  closed_by_name?:       string;
+}
+
+export interface LedgerAccount {
+  id:             string;
+  code:           string;
+  name:           string;
+  account_type:   "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
+  normal_balance: "DEBIT" | "CREDIT";
+  parent_id?:     string;
+  description?:   string;
+  branch_id?:     string;
+  is_system:      boolean;
+  is_active:      boolean;
+  created_at:     string;
+  updated_at:     string;
 }
 
 export interface CashRegistryTransaction {
@@ -1189,18 +1335,21 @@ export interface CashRegistryTransaction {
 }
 
 export interface BankAccount {
-  id:              string;
-  bank_name:       string;
-  account_number:  string;
-  account_name:    string;
-  branch_id:       string;
-  branch_name:     string;
-  current_balance: number;
-  is_active:       boolean;
-  created_at:      string;
-  updated_at:      string;
-  created_by_id?:  string;
-  updated_by_id?:  string;
+  id:                  string;
+  bank_name:           string;
+  account_number:      string;
+  account_name:        string;
+  branch_id:           string;
+  branch_name:         string;
+  ledger_account_id?:  string;
+  ledger_account_code?: string;
+  ledger_account_name?: string;
+  current_balance:     number;
+  is_active:           boolean;
+  created_at:          string;
+  updated_at:          string;
+  created_by_id?:      string;
+  updated_by_id?:      string;
 }
 
 export interface BankAccountTransaction {
@@ -1342,6 +1491,12 @@ export interface ApiError {
   details?: unknown;
 }
 
+export interface BulkUpdateResult {
+  updated: number;
+  failed:  number;
+  errors:  { id?: string; message: string }[];
+}
+
 export interface ImportResultError {
   row: number;
   message: string;
@@ -1386,4 +1541,33 @@ export interface DashboardStats {
   totalExpiring: number;
   totalPendingPOs: number;
   branchSummaries: BranchSummary[];
+}
+
+/* ── OCR / Text Scanner ────────────────────────────────────────────────────── */
+
+export interface OCRBoundingBox {
+  text:       string;
+  confidence: number;
+  x:          number;
+  y:          number;
+  width:      number;
+  height:     number;
+}
+
+export interface OCRResult {
+  text:            string;
+  confidence:      number;
+  bounding_boxes:  OCRBoundingBox[];
+  processing_time: number;
+  engine:          string;
+  image_width:     number;
+  image_height:    number;
+}
+
+export interface ScanHistoryItem {
+  id:           string;
+  thumbnail:    string;
+  clientResult: OCRResult | null;
+  serverResult: OCRResult | null;
+  timestamp:    string;
 }

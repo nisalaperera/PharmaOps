@@ -6,7 +6,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict, build_se
 from app.middleware.auth_middleware import get_current_user, require_min_role
 from app.utils.audit import audit_create_fields, audit_update_fields
 from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
-from app.utils.stock_log import log_stock_movement
+from app.utils.stock_log import log_inventory
 from app.utils.sequences import generate_document_number, get_branch_code
 from app.models.stock_movement import (
     StockMovementCreate, StockMovementUpdate, StockMovementResponse,
@@ -20,19 +20,13 @@ router = APIRouter(prefix="/stock-movements", tags=["Stock Movements"])
 SORT_FIELDS = {"created_at", "movement_number", "status", "type"}
 
 
-def _recalc_inventory(db, inventory_id: str, batches: list, current_user: dict, basic_sku: str | None = None, basic_sku_count: int | None = None):
-    basic_sku_total = sum(b.get("basic_sku_quantity", 0) for b in batches)
+def _recalc_inventory(db, inventory_id: str, batches: list, current_user: dict):
     now = datetime.now(timezone.utc).isoformat()
     updates: dict = {
         "batches": batches,
-        "basic_sku_total_quantity": basic_sku_total,
         "updated_at": now,
         **audit_update_fields(current_user),
     }
-    if basic_sku is not None:
-        updates["basic_sku"] = basic_sku
-    if basic_sku_count is not None:
-        updates["basic_sku_count"] = basic_sku_count
     db[Collections.INVENTORY].update_one({"_id": inventory_id}, {"$set": updates})
 
 
@@ -104,8 +98,8 @@ async def suggest_stock_location(
     is_expired = expiry_date < today
 
     # Step 1: Check movement logs for same product + same batch
-    log_match = db[Collections.STOCK_MOVEMENT_LOGS].find_one(
-        {"product_id": product_id, "batch_number": batch_number, "stock_location_id": {"$ne": None, "$ne": ""}},
+    log_match = db[Collections.INVENTORY_LOGS].find_one(
+        {"product_id": product_id, "batch_number": batch_number, "stock_location_id": {"$nin": [None, ""]}},
         sort=[("created_at", DESCENDING)],
     )
     if log_match and log_match.get("stock_location_id"):
@@ -136,7 +130,7 @@ async def suggest_stock_location(
             return LocationSuggestionResponse(stock_location_name=suggested_name, is_new=True)
     else:
         # Step 2 (non-expired): Check logs for same product, non-expired batches
-        non_expired_match = db[Collections.STOCK_MOVEMENT_LOGS].find_one(
+        non_expired_match = db[Collections.INVENTORY_LOGS].find_one(
             {
                 "product_id": product_id,
                 "stock_location_id": {"$ne": None, "$ne": ""},
@@ -304,59 +298,65 @@ async def confirm_item(
     item["confirmed_quantity"] = payload.confirmed_quantity
     if payload.stock_location_id:
         item["stock_location_id"]   = payload.stock_location_id
-    if payload.stock_location_name:
-        item["stock_location_name"] = payload.stock_location_name
 
     branch_id    = doc["branch_id"]
     product_id   = item["product_id"]
     product_name = item.get("product_name", "")
     movement_type = doc["type"]
 
-    product_doc   = db[Collections.PRODUCTS].find_one({"_id": product_id})
-    basic_sku     = product_doc.get("basic_sku_name", "") if product_doc else ""
-    sku_name      = item.get("sku", "")
-    sku_mappings  = product_doc.get("sku_mappings", []) if product_doc else []
+    product_doc    = db[Collections.PRODUCTS].find_one({"_id": product_id})
+    basic_sku_id   = product_doc.get("basic_sku_id", "")   if product_doc else ""
+    basic_sku_name = product_doc.get("basic_sku_name", "") if product_doc else ""
+    if not basic_sku_name and basic_sku_id:
+        sku_doc = db[Collections.SKUS].find_one({"_id": basic_sku_id}, {"name": 1})
+        basic_sku_name = sku_doc.get("name", "") if sku_doc else ""
+    sku_name       = item.get("sku", "") or basic_sku_name
+    sku_mappings   = product_doc.get("sku_mappings", []) if product_doc else []
     basic_sku_count = 1
     for m in sku_mappings:
         if m.get("sku") == sku_name:
             basic_sku_count = m.get("basic_sku_count", 1)
             break
 
-    basic_qty    = payload.confirmed_quantity * basic_sku_count
-    sell_price   = item.get("selling_price", 0)
-    buy_price    = item.get("purchase_price", 0)
-    basic_sell   = round(sell_price / basic_sku_count, 2) if basic_sku_count > 0 else sell_price
-    basic_buy    = round(buy_price / basic_sku_count, 2) if basic_sku_count > 0 else buy_price
+    basic_qty  = payload.confirmed_quantity * basic_sku_count
+    sell_price = item.get("selling_price", 0)
+    buy_price  = item.get("purchase_price", 0)
+    basic_sell = round(sell_price / basic_sku_count, 2) if basic_sku_count > 0 else sell_price
+    basic_buy  = round(buy_price / basic_sku_count, 2) if basic_sku_count > 0 else buy_price
 
-    item["basic_sku"]               = basic_sku
+    item["basic_sku"]               = basic_sku_name
+    item["basic_sku_id"]            = basic_sku_id
     item["basic_sku_count"]         = basic_sku_count
     item["basic_sku_quantity"]      = basic_qty
     item["basic_sku_selling_price"] = basic_sell
     item["basic_sku_purchase_price"] = basic_buy
 
+    movement_number = doc.get("movement_number", "")
+
     log_kwargs = dict(
         expiry_date=item.get("expiry_date"),
-        sku=sku_name, purchase_price=buy_price, selling_price=sell_price,
-        basic_sku=basic_sku, basic_sku_count=basic_sku_count, basic_sku_quantity=basic_qty,
-        basic_sku_selling_price=basic_sell, basic_sku_purchase_price=basic_buy,
+        sku=sku_name, selling_price=sell_price, purchase_price=buy_price,
+        basic_sku=basic_sku_name, basic_sku_id=basic_sku_id, basic_sku_count=basic_sku_count,
+        basic_sku_quantity=basic_qty, basic_sku_selling_price=basic_sell, basic_sku_purchase_price=basic_buy,
         stock_location_id=payload.stock_location_id,
+        reference_id=movement_id, reference_type="stock_movement", reference_value=movement_number,
     )
 
     if movement_type == "STOCK_IN":
-        inv = db[Collections.INVENTORY].find_one({"product_id": product_id, "branch_id": branch_id})
+        inv = db[Collections.INVENTORY].find_one({
+            "product_id": product_id, "branch_id": branch_id, "basic_sku": basic_sku_name,
+        })
         if not inv:
             now = datetime.now(timezone.utc).isoformat()
             inv = {
-                "_id":                     new_id(),
-                "branch_id":               branch_id,
-                "product_id":              product_id,
-                "product_name":            product_name,
-                "basic_sku":               basic_sku,
-                "basic_sku_count":         basic_sku_count,
-                "basic_sku_total_quantity": 0,
-                "batches":                 [],
-                "created_at":              now,
-                "updated_at":              now,
+                "_id":          new_id(),
+                "branch_id":    branch_id,
+                "product_id":   product_id,
+                "basic_sku":    basic_sku_name,
+                "basic_sku_id": basic_sku_id,
+                "batches":      [],
+                "created_at":   now,
+                "updated_at":   now,
                 **audit_create_fields(current_user),
             }
             db[Collections.INVENTORY].insert_one(inv)
@@ -364,31 +364,27 @@ async def confirm_item(
         batches  = list(inv.get("batches", []))
         existing = next((b for b in batches if b["batch_number"] == item["batch_number"]), None)
         if existing:
-            existing["quantity"]           += payload.confirmed_quantity
             existing["basic_sku_quantity"] = existing.get("basic_sku_quantity", 0) + basic_qty
         else:
             batches.append({
                 "batch_number":            item["batch_number"],
                 "expiry_date":             item["expiry_date"],
-                "quantity":                payload.confirmed_quantity,
-                "received_quantity":       payload.confirmed_quantity,
-                "basic_sku":               basic_sku,
                 "basic_sku_quantity":       basic_qty,
                 "basic_sku_selling_price":  basic_sell,
                 "basic_sku_purchase_price": basic_buy,
             })
-        _recalc_inventory(db, inv["_id"], batches, current_user, basic_sku, basic_sku_count)
+        _recalc_inventory(db, inv["_id"], batches, current_user)
 
-        log_stock_movement(
+        log_inventory(
             db, current_user, branch_id=branch_id, product_id=product_id,
-            product_name=product_name, batch_number=item["batch_number"],
-            quantity=payload.confirmed_quantity, movement_type="STOCK_IN",
-            reference_id=movement_id, reference_type="stock_movement",
-            **log_kwargs,
+            batch_number=item["batch_number"], quantity=payload.confirmed_quantity,
+            movement_type="STOCK_IN", **log_kwargs,
         )
 
     elif movement_type == "STOCK_OUT":
-        inv = db[Collections.INVENTORY].find_one({"product_id": product_id, "branch_id": branch_id})
+        inv = db[Collections.INVENTORY].find_one({
+            "product_id": product_id, "branch_id": branch_id, "basic_sku": basic_sku_name,
+        })
         if not inv:
             raise HTTPException(status_code=400, detail=f"No inventory found for '{product_name}'")
 
@@ -396,24 +392,19 @@ async def confirm_item(
         batch   = next((b for b in batches if b["batch_number"] == item["batch_number"]), None)
         if not batch:
             raise HTTPException(status_code=400, detail=f"Batch '{item['batch_number']}' not found")
-        if batch["quantity"] < payload.confirmed_quantity:
-            raise HTTPException(status_code=400, detail=f"Insufficient qty (available: {batch['quantity']})")
+        if batch.get("basic_sku_quantity", 0) < basic_qty:
+            raise HTTPException(status_code=400, detail=f"Insufficient qty (available: {batch.get('basic_sku_quantity', 0)})")
 
-        batch["quantity"]          -= payload.confirmed_quantity
         batch["basic_sku_quantity"] = batch.get("basic_sku_quantity", 0) - basic_qty
-        if batch["basic_sku_quantity"] < 0:
-            batch["basic_sku_quantity"] = 0
-        if batch["quantity"] <= 0:
+        if batch["basic_sku_quantity"] <= 0:
             batches = [b for b in batches if b["batch_number"] != item["batch_number"]]
 
-        _recalc_inventory(db, inv["_id"], batches, current_user, basic_sku, basic_sku_count)
+        _recalc_inventory(db, inv["_id"], batches, current_user)
 
-        log_stock_movement(
+        log_inventory(
             db, current_user, branch_id=branch_id, product_id=product_id,
-            product_name=product_name, batch_number=item["batch_number"],
-            quantity=payload.confirmed_quantity, movement_type="STOCK_OUT",
-            reason=item.get("reason"), reference_id=movement_id, reference_type="stock_movement",
-            **log_kwargs,
+            batch_number=item["batch_number"], quantity=payload.confirmed_quantity,
+            movement_type="STOCK_OUT", reason=item.get("reason"), **log_kwargs,
         )
 
     status = _update_movement_status(db, movement_id, items, current_user)

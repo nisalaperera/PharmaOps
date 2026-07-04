@@ -108,7 +108,11 @@ async def create_cheque_book(
         **audit_create_fields(current_user),
     }
     db[Collections.CHEQUE_BOOKS].insert_one(doc)
-    log_audit(db, current_user, "CREATE", "cheque_book", doc_id)
+    await log_audit(
+        user_id=current_user["id"], user_email=current_user["email"],
+        user_role=current_user["role"], action="CREATE",
+        resource="cheque_book", resource_id=doc_id,
+    )
     return _enrich_book(doc_to_dict(doc))
 
 
@@ -133,7 +137,11 @@ async def update_cheque_book(
     updates.update(audit_update_fields(current_user))
 
     db[Collections.CHEQUE_BOOKS].update_one({"_id": book_id}, {"$set": updates})
-    log_audit(db, current_user, "UPDATE", "cheque_book", book_id)
+    await log_audit(
+        user_id=current_user["id"], user_email=current_user["email"],
+        user_role=current_user["role"], action="UPDATE",
+        resource="cheque_book", resource_id=book_id,
+    )
     updated = db[Collections.CHEQUE_BOOKS].find_one({"_id": book_id})
     return _enrich_book(doc_to_dict(updated))
 
@@ -231,7 +239,11 @@ async def create_cheque_issue(
         {"_id": book_id},
         {"$inc": {"used_leaves": 1}, "$set": {"updated_at": now}},
     )
-    log_audit(db, current_user, "CREATE", "cheque_issue", doc_id)
+    await log_audit(
+        user_id=current_user["id"], user_email=current_user["email"],
+        user_role=current_user["role"], action="CREATE",
+        resource="cheque_issue", resource_id=doc_id,
+    )
     return doc_to_dict(doc)
 
 
@@ -303,6 +315,10 @@ async def update_cheque_issue_status(
         updates["notes"] = payload.notes
 
     db[Collections.CHEQUE_ISSUES].update_one({"_id": issue_id}, {"$set": updates})
-    log_audit(db, current_user, "UPDATE", "cheque_issue", issue_id)
+    await log_audit(
+        user_id=current_user["id"], user_email=current_user["email"],
+        user_role=current_user["role"], action="UPDATE",
+        resource="cheque_issue", resource_id=issue_id,
+    )
     updated = db[Collections.CHEQUE_ISSUES].find_one({"_id": issue_id})
     return doc_to_dict(updated)

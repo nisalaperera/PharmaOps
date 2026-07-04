@@ -70,6 +70,11 @@ def require_min_role(min_role: str):
     from app.models.user import ROLE_HIERARCHY
 
     async def _check(current_user: dict = Depends(get_current_user)) -> dict:
+        if current_user.get("role") not in ROLE_HIERARCHY:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: unrecognized role",
+            )
         user_role_idx = ROLE_HIERARCHY.index(current_user["role"])
         min_role_idx  = ROLE_HIERARCHY.index(min_role)
         if user_role_idx < min_role_idx:

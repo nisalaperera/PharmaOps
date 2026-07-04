@@ -1,3 +1,4 @@
+import re
 import uuid
 from functools import lru_cache
 from pymongo import MongoClient, ASCENDING, DESCENDING
@@ -57,7 +58,7 @@ def build_search_filter(search: str | None, fields: list[str]) -> dict:
     """Build a MongoDB $or regex filter for search across multiple fields."""
     if not search:
         return {}
-    pattern = {"$regex": search, "$options": "i"}
+    pattern = {"$regex": re.escape(search), "$options": "i"}
     return {"$or": [{field: pattern} for field in fields]}
 
 
@@ -72,6 +73,7 @@ class Collections:
     BRANDS          = "product_brands"
     CATEGORIES      = "product_categories"
     SKUS            = "product_skus"
+    AGENCIES        = "product_agencies"
     INVENTORY       = "inventory"
     SUPPLIERS       = "suppliers"
     PURCHASE_ORDERS = "purchase_orders"
@@ -91,6 +93,9 @@ class Collections:
     PREFERENCES                  = "user_preferences"
     CASH_REGISTRIES              = "cash_registries"
     CASH_REGISTRY_TRANSACTIONS   = "cash_registry_transactions"
+    CASH_REGISTRY_SESSIONS       = "cash_registry_sessions"
+    LEDGER_ACCOUNTS              = "ledger_accounts"
+    JOURNAL_ENTRIES              = "journal_entries"
     BANK_ACCOUNTS                = "bank_accounts"
     BANK_ACCOUNT_TRANSACTIONS    = "bank_account_transactions"
     FUND_TRANSFERS               = "fund_transfers"
@@ -103,8 +108,10 @@ class Collections:
     PURCHASE_INVOICES            = "purchase_invoices"
     PURCHASE_PAYMENTS            = "purchase_payments"
     PURCHASE_CREDIT_NOTES        = "purchase_credit_notes"
+    PURCHASE_RETURNS             = "purchase_returns"
     STOCK_LOCATIONS               = "stock_locations"
-    STOCK_MOVEMENT_LOGS          = "stock_movement_logs"
+    INVENTORY_LOGS               = "inventory_logs"
     STOCK_MOVEMENTS              = "stock_movements"
     REP_VISITS                   = "channel_rep_visits"
     SEQUENCES                    = "sequences"
+    PROMOTION_TEMPLATES          = "promotion_templates"

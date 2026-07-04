@@ -63,7 +63,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
   });
   const { data: suppliersData } = useQuery<PaginatedResponse<Supplier>>({
     queryKey: ["suppliers-select"],
-    queryFn:  () => apiGet<PaginatedResponse<Supplier>>("/suppliers", { is_active: "true", supplier_type: "DISTRIBUTOR", page_size: 200 }),
+    queryFn:  () => apiGet<PaginatedResponse<Supplier>>("/suppliers", { is_active: "true", page_size: 200 }),
     enabled:  isOpen,
   });
   const { data: productsData } = useQuery<PaginatedResponse<Product>>({
@@ -90,7 +90,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
   const convertePOs = poData?.data         ?? [];
 
   const selectedSupplier = suppliers.find((s) => s.id === watchedSupplierId);
-  const channelOptions   = selectedSupplier?.distributor_channels ?? [];
+  const channelOptions   = selectedSupplier?.channels ?? [];
 
   // ── Reset on open ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -169,10 +169,10 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
   const manualTotal    = Number(form.watch("manual_total_amount"))  || 0;
   const manualReturn   = Number(form.watch("manual_return_amount")) || 0;
 
-  const computedTotal = watchedItems.reduce(
-    (s, it) => s + ((Number(it.unit_quantity) || 0) * (Number(it.unit_price) || 0) - (Number(it.discount) || 0)),
-    0,
-  );
+  const computedTotal = watchedItems.reduce((s, it) => {
+    const subtotal = (Number(it.unit_quantity) || 0) * (Number(it.unit_price) || 0);
+    return s + Math.max(0, subtotal - subtotal * ((Number(it.discount) || 0) / 100));
+  }, 0);
   const computedReturn = watchedReturns.reduce(
     (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
     0,
@@ -316,12 +316,13 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
             <>
               <div className="hidden lg:grid gap-2 px-2 pb-1 text-xs font-medium uppercase tracking-wide"
                    style={{ gridTemplateColumns: "1.5fr 80px 80px 64px 56px 64px 80px 80px 80px 32px", color: "var(--color-text-muted)" }}>
-                <span>Product</span><span>Batch No</span><span>SKU</span><span>Unit Qty</span><span>Free</span><span>Disc.</span><span>Unit Price</span><span>Sell Price</span><span>Line Total</span><span />
+                <span>Product</span><span>Batch No</span><span>SKU</span><span>Unit Qty</span><span>Free</span><span>Disc. %</span><span>Unit Price</span><span>Sell Price</span><span>Line Total</span><span />
               </div>
               <div className="space-y-2">
                 {itemsArray.fields.map((field, index) => {
-                  const it    = watchedItems[index];
-                  const line  = (Number(it?.unit_quantity) || 0) * (Number(it?.unit_price) || 0) - (Number(it?.discount) || 0);
+                  const it       = watchedItems[index];
+                  const subtotal = (Number(it?.unit_quantity) || 0) * (Number(it?.unit_price) || 0);
+                  const line     = Math.max(0, subtotal - subtotal * ((Number(it?.discount) || 0) / 100));
                   const errs  = form.formState.errors.items?.[index];
                   return (
                     <div key={field.rhfKey} className="grid gap-2 items-start"
@@ -337,7 +338,7 @@ export function PurchaseInvoiceModal({ isOpen, onClose, editing, defaultPOId }: 
                       <Input placeholder="SKU" {...form.register(`items.${index}.sku`)} />
                       <Input type="number" min={1} {...form.register(`items.${index}.unit_quantity`, { valueAsNumber: true })} error={errs?.unit_quantity?.message} />
                       <Input type="number" min={0} {...form.register(`items.${index}.free_quantity`, { valueAsNumber: true })} />
-                      <Input type="number" min={0} step="0.01" {...form.register(`items.${index}.discount`, { valueAsNumber: true })} />
+                      <Input type="number" min={0} max={100} step="0.01" {...form.register(`items.${index}.discount`, { valueAsNumber: true })} />
                       <Input type="number" min={0} step="0.01"
                         {...form.register(`items.${index}.unit_price`, {
                           valueAsNumber: true,

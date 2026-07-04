@@ -8,6 +8,8 @@ from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
 from app.utils.sequences import generate_document_number, get_branch_code
 from app.utils.notify import notify_branch_users
+from app.utils.stock_log import log_inventory
+from app.utils.inventory_stock import batch_qty, set_batch_qty, inventory_totals, find_inventory_with_batch
 from app.utils.branch_scope import apply_branch_filter, ensure_branch_access, enforce_branch_on_create
 from app.models.sale import SaleCreate, SaleUpdate, SaleResponse
 from app.models.common import PaginatedResponse
@@ -158,6 +160,26 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
     change_amount = max(0.0, payload.paid_amount - total_amount)
     doc_id        = new_id()
 
+    # Validate stock availability BEFORE recording the sale (aggregate lines
+    # that hit the same batch so the combined quantity is checked).
+    requested: dict[tuple[str, str], int] = {}
+    for item in payload.items:
+        key = (item.product_id, item.batch_number)
+        requested[key] = requested.get(key, 0) + item.quantity
+    for (product_id, batch_number), req_qty in requested.items():
+        inv_doc, batch = find_inventory_with_batch(db, product_id, payload.branch_id, batch_number)
+        if not inv_doc or not batch:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Batch '{batch_number}' not found in inventory for product '{product_id}'",
+            )
+        available = batch_qty(batch)
+        if req_qty > available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Insufficient stock for batch '{batch_number}': requested {req_qty}, available {available}",
+            )
+
     branch_code    = get_branch_code(db, payload.branch_id)
     invoice_number = generate_document_number(db, branch_code, "SI")
 
@@ -196,43 +218,37 @@ async def create_sale(payload: SaleCreate, current_user: dict = Depends(get_curr
     }
     db[Collections.SALES].insert_one(sale_data)
 
-    # Deduct inventory stock
-    for item in payload.items:
-        inv_doc = db[Collections.INVENTORY].find_one({
-            "product_id": item.product_id,
-            "branch_id":  payload.branch_id,
-        })
-        if inv_doc:
-            was_low_stock = inv_doc.get("is_low_stock", False)
-            batches = inv_doc.get("batches", [])
-            for batch in batches:
-                if batch["batch_number"] == item.batch_number:
-                    batch["quantity"] = max(0, batch["quantity"] - item.quantity)
-            total_qty = sum(b["quantity"] for b in batches)
+    # Deduct inventory stock (one aggregated deduction per product+batch)
+    for (product_id, batch_number), req_qty in requested.items():
+        inv_doc, batch = find_inventory_with_batch(db, product_id, payload.branch_id, batch_number)
+        if not inv_doc or not batch:
+            continue  # validated above; only a concurrent mutation can land here
+        was_low_stock = inv_doc.get("is_low_stock", False)
+        set_batch_qty(batch, max(0, batch_qty(batch) - req_qty))
+        batches = [b for b in inv_doc.get("batches", []) if batch_qty(b) > 0]
+        totals  = inventory_totals(inv_doc, batches)
+        db[Collections.INVENTORY].update_one({"_id": inv_doc["_id"]}, {"$set": totals})
+
+        product_name = next(
+            (i["product_name"] for i in items_data if i["product_id"] == product_id),
+            "",
+        )
+        log_inventory(
+            db, current_user, branch_id=payload.branch_id, product_id=product_id,
+            batch_number=batch_number, quantity=req_qty, movement_type="SALE",
+            basic_sku_quantity=req_qty,
+            reference_id=doc_id, reference_type="sale", reference_value=invoice_number,
+        )
+        if totals["is_low_stock"] and not was_low_stock:
             min_level = inv_doc.get("min_stock_level", 0)
-            is_low_stock = total_qty <= min_level
-            db[Collections.INVENTORY].update_one(
-                {"_id": inv_doc["_id"]},
-                {"$set": {
-                    "batches":        batches,
-                    "total_quantity": total_qty,
-                    "is_low_stock":   is_low_stock,
-                    "updated_at":     now,
-                }}
+            notify_branch_users(
+                db,
+                branch_id=payload.branch_id,
+                type="LOW_STOCK",
+                title="Low stock alert",
+                message=f"{product_name or 'A product'} is low on stock ({totals['total_quantity']} remaining, minimum {min_level}).",
+                action_url="/inventory",
             )
-            if is_low_stock and not was_low_stock:
-                product_name = next(
-                    (i["product_name"] for i in items_data if i["product_id"] == item.product_id),
-                    "",
-                )
-                notify_branch_users(
-                    db,
-                    branch_id=payload.branch_id,
-                    type="LOW_STOCK",
-                    title="Low stock alert",
-                    message=f"{product_name or 'A product'} is low on stock ({total_qty} remaining, minimum {min_level}).",
-                    action_url="/inventory",
-                )
 
     # Credit sales: add to customer outstanding balance
     if payload.payment_method == "CREDIT" and payload.customer_id:
@@ -287,9 +303,25 @@ async def update_sale(
 
     sale = doc_to_dict(doc)
     ensure_branch_access(sale, current_user)
+
+    # Refunds are terminal / capped — never allow replaying them.
+    if payload.status in ("REFUNDED", "PARTIAL_REFUND"):
+        if sale.get("status") == "REFUNDED":
+            raise HTTPException(status_code=400, detail="Sale has already been fully refunded")
+        max_refundable = round(sale.get("total_amount", 0) - sale.get("refund_amount", 0), 2)
+        requested_refund = payload.refund_amount if payload.refund_amount else max_refundable
+        if requested_refund > max_refundable + 0.001:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Refund amount exceeds remaining refundable balance of {max_refundable:.2f}",
+            )
+
     updates = {k: v for k, v in payload.model_dump(exclude_unset=True).items() if v is not None}
     updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     updates.update(audit_update_fields(current_user))
+
+    if payload.status in ("REFUNDED", "PARTIAL_REFUND"):
+        updates["refund_amount"] = round(sale.get("refund_amount", 0) + requested_refund, 2)
 
     db[Collections.SALES].update_one({"_id": sale_id}, {"$set": updates})
 
@@ -298,7 +330,7 @@ async def update_sale(
         customer_id    = sale.get("customer_id")
         payment_method = sale.get("payment_method")
         if customer_id and payment_method == "CREDIT":
-            refund_amt = payload.refund_amount if payload.refund_amount else sale.get("total_amount", 0)
+            refund_amt = requested_refund
             db[Collections.CUSTOMERS].update_one(
                 {"_id": customer_id},
                 {"$inc": {"outstanding_balance": -refund_amt}}

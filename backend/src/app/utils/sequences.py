@@ -25,7 +25,9 @@ def generate_document_number(
     if ref_date:
         date_part = ref_date[:10]
     else:
-        date_part = datetime.now(timezone.utc).date().isoformat()
+        # Local business date, not UTC — documents created in the evening must
+        # not be numbered under the previous/next day.
+        date_part = datetime.now().astimezone().date().isoformat()
 
     yyyy, mm, dd = date_part.split("-")
     counter_key  = f"{branch_code}/{doc_type}/{yyyy}/{mm}/{dd}"

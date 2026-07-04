@@ -9,6 +9,7 @@ from app.utils.notify import notify_branch_users
 from app.utils.branch_scope import BRANCH_LEVEL_ROLES, enforce_branch_on_create
 from app.utils.audit import audit_create_fields, audit_update_fields
 from app.utils.sequences import generate_document_number, get_branch_code
+from app.utils.inventory_stock import batch_qty, set_batch_qty, inventory_totals, find_inventory_with_batch, find_or_create_inventory
 
 router = APIRouter(prefix="/inventory/stock-transfers", tags=["Inventory"])
 
@@ -41,47 +42,38 @@ def _resolve_transfer(data: dict, db) -> dict:
     return data
 
 
-def _log_transfer_movement(db, current_user, branch_id, items, movement_type, transfer_id):
-    from app.utils.stock_log import log_stock_movement
+def _log_transfer_movement(db, current_user, branch_id, items, movement_type, transfer_id, reference_value=""):
+    from app.utils.stock_log import log_inventory
     for item in items:
-        log_stock_movement(
+        log_inventory(
             db, current_user,
             branch_id=branch_id,
             product_id=item.get("product_id", ""),
-            product_name=item.get("product_name", ""),
             batch_number=item.get("batch_number", ""),
             quantity=item.get("quantity", 0) if movement_type == "TRANSFER_OUT" else item.get("received_quantity", 0),
             movement_type=movement_type,
             reference_id=transfer_id,
             reference_type="transfer",
+            reference_value=reference_value,
         )
 
 
 def _deduct_source_inventory(db, source_branch_id, items, current_user):
     for item in items:
-        inv_doc = db[Collections.INVENTORY].find_one({
-            "product_id": item.get("product_id"),
-            "branch_id": source_branch_id,
-        })
+        inv_doc, batch = find_inventory_with_batch(db, item.get("product_id"), source_branch_id, item.get("batch_number"))
         if not inv_doc:
             raise HTTPException(status_code=400, detail=f"No inventory for product '{item.get('product_name', item.get('product_id'))}' in source branch")
-
-        batches = list(inv_doc.get("batches", []))
-        batch = next((b for b in batches if b["batch_number"] == item.get("batch_number")), None)
         if not batch:
             raise HTTPException(status_code=400, detail=f"Batch '{item.get('batch_number')}' not found for product '{item.get('product_name', '')}'")
-        if item["quantity"] > batch["quantity"]:
-            raise HTTPException(status_code=400, detail=f"Insufficient stock in batch '{item.get('batch_number')}': requested {item['quantity']}, available {batch['quantity']}")
+        available = batch_qty(batch)
+        if item["quantity"] > available:
+            raise HTTPException(status_code=400, detail=f"Insufficient stock in batch '{item.get('batch_number')}': requested {item['quantity']}, available {available}")
 
-        batch["quantity"] -= item["quantity"]
-        batches = [b for b in batches if b["quantity"] > 0]
-
-        total_qty = sum(b["quantity"] for b in batches)
-        is_low = total_qty <= inv_doc.get("min_stock_level", 0)
-        now = datetime.now(timezone.utc).isoformat()
+        set_batch_qty(batch, available - item["quantity"])
+        batches = [b for b in inv_doc.get("batches", []) if batch_qty(b) > 0]
         db[Collections.INVENTORY].update_one(
             {"_id": inv_doc["_id"]},
-            {"$set": {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low, "updated_at": now, **audit_update_fields(current_user)}},
+            {"$set": {**inventory_totals(inv_doc, batches), **audit_update_fields(current_user)}},
         )
 
 
@@ -91,61 +83,38 @@ def _add_destination_inventory(db, dest_branch_id, source_branch_id, items, curr
         if recv_qty <= 0:
             continue
 
-        source_inv = db[Collections.INVENTORY].find_one({
-            "product_id": item.get("product_id"),
-            "branch_id": source_branch_id,
-        })
-        source_batch = None
-        if source_inv:
-            source_batch = next((b for b in source_inv.get("batches", []) if b["batch_number"] == item.get("batch_number")), None)
+        _, source_batch = find_inventory_with_batch(db, item.get("product_id"), source_branch_id, item.get("batch_number"))
 
-        dest_inv = db[Collections.INVENTORY].find_one({
-            "product_id": item.get("product_id"),
-            "branch_id": dest_branch_id,
-        })
+        dest_inv = find_or_create_inventory(
+            db, current_user,
+            product_id=item.get("product_id"), branch_id=dest_branch_id,
+            product_name=item.get("product_name", ""),
+        )
         now = datetime.now(timezone.utc).isoformat()
-
-        if not dest_inv:
-            product = db[Collections.PRODUCTS].find_one({"_id": item.get("product_id")}, {"name": 1})
-            dest_inv = {
-                "_id":             new_id(),
-                "branch_id":       dest_branch_id,
-                "product_id":      item.get("product_id"),
-                "product_name":    product["name"] if product else item.get("product_name", ""),
-                "batches":         [],
-                "total_quantity":  0,
-                "min_stock_level": 0,
-                "is_low_stock":    False,
-                "created_at":      now,
-                "updated_at":      now,
-                **audit_create_fields(current_user),
-            }
-            db[Collections.INVENTORY].insert_one(dest_inv)
 
         batches = list(dest_inv.get("batches", []))
         existing = next((b for b in batches if b["batch_number"] == item.get("batch_number")), None)
         if existing:
-            existing["quantity"] += recv_qty
+            set_batch_qty(existing, batch_qty(existing) + recv_qty)
         else:
             new_batch = {
                 "batch_number":   item.get("batch_number"),
                 "expiry_date":    source_batch.get("expiry_date", "") if source_batch else "",
-                "quantity":       recv_qty,
-                "received_quantity": recv_qty,
+                "basic_sku_quantity": recv_qty,
                 "sku":            source_batch.get("sku", "") if source_batch else "",
                 "purchase_price": source_batch.get("purchase_price", 0) if source_batch else 0,
                 "selling_price":  source_batch.get("selling_price", 0) if source_batch else 0,
+                "basic_sku_purchase_price": source_batch.get("basic_sku_purchase_price", source_batch.get("purchase_price", 0)) if source_batch else 0,
+                "basic_sku_selling_price":  source_batch.get("basic_sku_selling_price", source_batch.get("selling_price", 0)) if source_batch else 0,
                 "supplier_id":    source_batch.get("supplier_id", "") if source_batch else "",
                 "supplier_name":  source_batch.get("supplier_name", "") if source_batch else "",
                 "received_date":  now[:10],
             }
             batches.append(new_batch)
 
-        total_qty = sum(b["quantity"] for b in batches)
-        is_low = total_qty <= dest_inv.get("min_stock_level", 0)
         db[Collections.INVENTORY].update_one(
             {"_id": dest_inv["_id"]},
-            {"$set": {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low, "updated_at": now, **audit_update_fields(current_user)}},
+            {"$set": {**inventory_totals(dest_inv, batches), **audit_update_fields(current_user)}},
         )
 
 
@@ -189,6 +158,9 @@ async def create_transfer(
     doc_id = new_id()
     payload.source_branch_id = enforce_branch_on_create(payload.source_branch_id, current_user)
 
+    if payload.source_branch_id == payload.destination_branch_id:
+        raise HTTPException(status_code=400, detail="Source and destination branches must be different")
+
     branch_code     = get_branch_code(db, payload.source_branch_id)
     transfer_number = generate_document_number(db, branch_code, "ST")
 
@@ -222,12 +194,15 @@ async def dispatch_transfer(
     if not existing:
         raise HTTPException(status_code=404, detail="Transfer not found")
     _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
-    if existing["status"] != "PENDING":
-        raise HTTPException(status_code=400, detail="Only PENDING transfers can be dispatched")
+    if existing["status"] not in ("PENDING", "CONFIRMED"):
+        raise HTTPException(status_code=400, detail="Only PENDING or CONFIRMED transfers can be dispatched")
+    # Only the sending branch may dispatch.
+    if current_user["role"] in BRANCH_LEVEL_ROLES and current_user["branch_id"] != existing["source_branch_id"]:
+        raise HTTPException(status_code=403, detail="Only the source branch can dispatch this transfer")
 
     items = existing.get("items", [])
     _deduct_source_inventory(db, existing["source_branch_id"], items, current_user)
-    _log_transfer_movement(db, current_user, existing["source_branch_id"], items, "TRANSFER_OUT", transfer_id)
+    _log_transfer_movement(db, current_user, existing["source_branch_id"], items, "TRANSFER_OUT", transfer_id, reference_value=existing.get("transfer_number", ""))
 
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.STOCK_TRANSFERS].update_one(
@@ -256,6 +231,9 @@ async def receive_transfer(
     _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
     if existing["status"] not in ("IN_TRANSIT", "PARTIALLY_RECEIVED"):
         raise HTTPException(status_code=400, detail="Only IN_TRANSIT or PARTIALLY_RECEIVED transfers can be received")
+    # Only the receiving branch may receive.
+    if current_user["role"] in BRANCH_LEVEL_ROLES and current_user["branch_id"] != existing["destination_branch_id"]:
+        raise HTTPException(status_code=403, detail="Only the destination branch can receive this transfer")
 
     items = list(existing.get("items", []))
     recv_map = {(r.product_id, r.batch_number): r.received_quantity for r in payload.items}
@@ -265,11 +243,19 @@ async def receive_transfer(
         key = (item["product_id"], item["batch_number"])
         if key in recv_map:
             qty = recv_map[key]
+            if qty <= 0:
+                continue
+            remaining = item["quantity"] - item.get("received_quantity", 0)
+            if qty > remaining:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot receive {qty} of batch '{item['batch_number']}': only {max(0, remaining)} remaining on this transfer",
+                )
             item["received_quantity"] = item.get("received_quantity", 0) + qty
             receive_items.append({"product_id": item["product_id"], "product_name": item.get("product_name", ""), "batch_number": item["batch_number"], "received_quantity": qty})
 
     _add_destination_inventory(db, existing["destination_branch_id"], existing["source_branch_id"], receive_items, current_user)
-    _log_transfer_movement(db, current_user, existing["destination_branch_id"], receive_items, "TRANSFER_IN", transfer_id)
+    _log_transfer_movement(db, current_user, existing["destination_branch_id"], receive_items, "TRANSFER_IN", transfer_id, reference_value=existing.get("transfer_number", ""))
 
     all_received = all(item.get("received_quantity", 0) >= item["quantity"] for item in items)
     new_status = "RECEIVED" if all_received else "PARTIALLY_RECEIVED"
@@ -314,24 +300,27 @@ async def reject_transfer(
     if not existing:
         raise HTTPException(status_code=404, detail="Transfer not found")
     _ensure_transfer_branch_access(doc_to_dict(existing), current_user)
-    if existing["status"] not in ("PENDING", "IN_TRANSIT"):
-        raise HTTPException(status_code=400, detail="Only PENDING or IN_TRANSIT transfers can be rejected")
+    if existing["status"] not in ("PENDING", "CONFIRMED", "IN_TRANSIT", "PARTIALLY_RECEIVED"):
+        raise HTTPException(status_code=400, detail="Only PENDING, CONFIRMED, IN_TRANSIT or PARTIALLY_RECEIVED transfers can be rejected")
 
-    if existing["status"] == "IN_TRANSIT":
-        items = existing.get("items", [])
-        for item in items:
-            inv_doc = db[Collections.INVENTORY].find_one({"product_id": item["product_id"], "branch_id": existing["source_branch_id"]})
-            if inv_doc:
-                batches = list(inv_doc.get("batches", []))
-                batch = next((b for b in batches if b["batch_number"] == item["batch_number"]), None)
-                if batch:
-                    batch["quantity"] += item["quantity"]
-                else:
-                    batches.append({"batch_number": item["batch_number"], "expiry_date": "", "quantity": item["quantity"], "sku": "", "purchase_price": 0, "selling_price": 0, "supplier_id": "", "supplier_name": "", "received_date": ""})
-                total_qty = sum(b["quantity"] for b in batches)
-                is_low = total_qty <= inv_doc.get("min_stock_level", 0)
-                now_ts = datetime.now(timezone.utc).isoformat()
-                db[Collections.INVENTORY].update_one({"_id": inv_doc["_id"]}, {"$set": {"batches": batches, "total_quantity": total_qty, "is_low_stock": is_low, "updated_at": now_ts}})
+    if existing["status"] in ("IN_TRANSIT", "PARTIALLY_RECEIVED"):
+        # Restore the un-received remainder to the source branch.
+        for item in existing.get("items", []):
+            restore_qty = item["quantity"] - item.get("received_quantity", 0)
+            if restore_qty <= 0:
+                continue
+            inv_doc = find_or_create_inventory(
+                db, current_user,
+                product_id=item["product_id"], branch_id=existing["source_branch_id"],
+                product_name=item.get("product_name", ""),
+            )
+            batches = list(inv_doc.get("batches", []))
+            batch = next((b for b in batches if b["batch_number"] == item["batch_number"]), None)
+            if batch:
+                set_batch_qty(batch, batch_qty(batch) + restore_qty)
+            else:
+                batches.append({"batch_number": item["batch_number"], "expiry_date": "", "basic_sku_quantity": restore_qty, "sku": "", "purchase_price": 0, "selling_price": 0, "supplier_id": "", "supplier_name": "", "received_date": ""})
+            db[Collections.INVENTORY].update_one({"_id": inv_doc["_id"]}, {"$set": inventory_totals(inv_doc, batches)})
 
     now = datetime.now(timezone.utc).isoformat()
     db[Collections.STOCK_TRANSFERS].update_one(

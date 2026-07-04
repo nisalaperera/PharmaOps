@@ -4,7 +4,7 @@ from app.core.database import get_db, Collections, new_id, doc_to_dict
 from app.middleware.auth_middleware import require_min_role, get_current_user
 from app.middleware.audit_middleware import log_audit
 from app.utils.audit import audit_create_fields, audit_update_fields
-from app.utils.branch_scope import apply_branch_filter, enforce_branch_on_create
+from app.utils.branch_scope import apply_branch_filter, enforce_branch_on_create, ensure_branch_access
 from app.utils.sequences import generate_document_number, get_branch_code
 from app.models.purchase_credit_note import (
     PurchaseCreditNoteCreate, PurchaseCreditNoteUpdate, PurchaseCreditNoteResponse,
@@ -24,11 +24,11 @@ def _resolve_names(db, doc: dict) -> dict:
     if d.get("supplier_id") and d.get("channel_id"):
         sup = db[Collections.SUPPLIERS].find_one({"_id": d["supplier_id"]})
         if sup:
-            for ch_list in ("agency_channels", "distributor_channels"):
-                for ch in sup.get(ch_list, []):
-                    if ch.get("id") == d["channel_id"]:
-                        d["channel_name"] = ch.get("channel_name", "")
-                        break
+            all_channels = sup.get("channels", []) + sup.get("agency_channels", []) + sup.get("distributor_channels", [])
+            for ch in all_channels:
+                if ch.get("id") == d["channel_id"]:
+                    d["channel_name"] = ch.get("channel_name", "")
+                    break
     return d
 
 
@@ -142,6 +142,7 @@ async def get_credit_note(cn_id: str, current_user: dict = Depends(get_current_u
     doc = db[Collections.PURCHASE_CREDIT_NOTES].find_one({"_id": cn_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Credit note not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     return PurchaseCreditNoteResponse(**_resolve_names(db, doc))
 
 
@@ -155,6 +156,7 @@ async def update_credit_note(
     doc = db[Collections.PURCHASE_CREDIT_NOTES].find_one({"_id": cn_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Credit note not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc.get("status") != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT credit notes can be edited")
 
@@ -184,6 +186,7 @@ async def approve_credit_note(
     doc = db[Collections.PURCHASE_CREDIT_NOTES].find_one({"_id": cn_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Credit note not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc.get("status") != "DRAFT":
         raise HTTPException(status_code=400, detail="Only DRAFT credit notes can be approved")
 
@@ -209,6 +212,7 @@ async def cancel_credit_note(
     doc = db[Collections.PURCHASE_CREDIT_NOTES].find_one({"_id": cn_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Credit note not found")
+    ensure_branch_access(doc_to_dict(doc), current_user)
     if doc.get("status") not in ("DRAFT", "APPROVED"):
         raise HTTPException(status_code=400, detail="Only DRAFT or APPROVED credit notes can be cancelled")
 
